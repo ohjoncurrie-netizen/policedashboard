@@ -26,7 +26,19 @@ def process_new_blotter(pdf_path: str, county: str = None) -> int:
     
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
-    
+
+    filename = os.path.basename(pdf_path)
+
+    # Deduplicate — skip if this filename was already processed
+    conn = sqlite3.connect(DB_PATH)
+    existing = conn.execute(
+        'SELECT id FROM blotters WHERE filename = ?', (filename,)
+    ).fetchone()
+    conn.close()
+    if existing:
+        logging.info(f"Skipping duplicate blotter: {filename} (already blotter #{existing[0]})")
+        return existing[0]
+
     logging.info(f"Processing blotter: {pdf_path}")
     
     # Step 1: Parse the PDF
@@ -50,8 +62,8 @@ def process_new_blotter(pdf_path: str, county: str = None) -> int:
     try:
         # Create the Batch Entry
         cursor.execute(
-            'INSERT INTO blotters (filename, county, incident_count, file_path) VALUES (?, ?, ?, ?)', 
-            (os.path.basename(pdf_path), county, result['total_count'], pdf_path)
+            'INSERT INTO blotters (filename, county, incident_count, file_path) VALUES (?, ?, ?, ?)',
+            (filename, county, result['total_count'], pdf_path)
         )
         batch_id = cursor.lastrowid
         logging.info(f"Created blotter batch #{batch_id}")
