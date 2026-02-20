@@ -1,0 +1,13 @@
+# Montana Blotter cron jobs
+
+# Cleanup old files daily at midnight
+0 0 * * * /root/montanablotter/cleanup.sh
+
+# Fetch and process blotter emails every 15 minutes
+*/15 * * * * /root/montanablotter/venv/bin/python3 /root/montanablotter/email_worker.py >> /root/montanablotter/mail.log 2>&1
+
+# Morning briefing daily at 7am
+0 7 * * * /root/montanablotter/venv/bin/python3 /root/montanablotter/morning_briefing.py >> /root/montanablotter/briefing.log 2>&1
+
+# Daily DB backup at 2am
+0 2 * * * /root/montanablotter/backup_db.sh >> /root/montanablotter/backup.log 2>&1
