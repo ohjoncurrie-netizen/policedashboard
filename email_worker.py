@@ -12,7 +12,7 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import config
-from processor import process_new_blotter
+from processor import process_new_blotter, process_text_blotter
 
 # Setup logging
 logging.basicConfig(
@@ -45,16 +45,16 @@ class EmailWorker:
             
             logging.info("Connected to IONOS IMAP successfully")
             
-            # Search for UNSEEN emails with "Blotter" in subject
-            status, messages = mail.search(None, f'(UNSEEN SUBJECT "{config.BLOTTER_SUBJECT_KEYWORD}")')
-            
+            # Search all unread emails
+            status, messages = mail.search(None, 'UNSEEN')
+
             if status != 'OK' or not messages[0]:
-                logging.info("No new blotter emails found")
+                logging.info("No new emails found")
                 mail.logout()
                 return 0
-            
+
             email_ids = messages[0].split()
-            logging.info(f"Found {len(email_ids)} new blotter emails")
+            logging.info(f"Found {len(email_ids)} unread emails to scan")
             
             processed_count = 0
             
@@ -71,17 +71,36 @@ class EmailWorker:
                             subject = msg.get('subject', 'No Subject')
                             sender = msg.get('from', 'Unknown')
                             logging.info(f"Processing email: {subject} from {sender}")
-                            
+
+                            # Skip bounce / delivery-failure emails
+                            if 'mailer-daemon' in sender.lower() or 'delivery' in subject.lower():
+                                logging.info(f"Skipping bounce/delivery email: {subject}")
+                                continue
+
                             # Process attachments
-                            pdf_count = self._process_attachments(msg)
-                            
-                            if pdf_count > 0:
-                                # Mark as processed by moving to Processed folder
-                                self._move_to_processed(mail, num)
-                                processed_count += 1
-                                logging.info(f"Successfully processed email with {pdf_count} PDF(s)")
+                            had_pdf, pdf_succeeded = self._process_attachments(msg)
+
+                            if had_pdf:
+                                # Email had PDF(s) — mark processed regardless of parse errors
+                                if pdf_succeeded:
+                                    self._move_to_processed(mail, num)
+                                    processed_count += 1
+                                    logging.info("Successfully processed email with PDF(s)")
+                                else:
+                                    logging.error(f"PDF(s) found but all failed to process: {subject}")
                             else:
-                                logging.warning(f"No PDFs found in email: {subject}")
+                                # No PDF — try plain-text body as blotter
+                                body = self._extract_body_text(msg)
+                                if body and len(body.strip()) > 200:
+                                    try:
+                                        process_text_blotter(body, sender_email=sender)
+                                        self._move_to_processed(mail, num)
+                                        processed_count += 1
+                                        logging.info("Processed text-body blotter from email")
+                                    except Exception as e:
+                                        logging.error(f"Failed to process text blotter: {e}")
+                                else:
+                                    logging.info(f"No blotter content found in email: {subject} — skipping")
                 
                 except Exception as e:
                     logging.error(f"Error processing email {num}: {str(e)}")
@@ -100,35 +119,64 @@ class EmailWorker:
             logging.error(f"Email worker critical error: {str(e)}")
             return 0
     
-    def _process_attachments(self, msg):
-        """Extract and process PDF attachments from email"""
-        pdf_count = 0
-        
+    def _process_attachments(self, msg) -> tuple[bool, bool]:
+        """
+        Extract and process PDF attachments from email.
+        Returns (had_pdf, any_succeeded):
+          had_pdf      — True if at least one .pdf attachment was found
+          any_succeeded — True if at least one was successfully processed
+        """
+        had_pdf = False
+        any_succeeded = False
+
         for part in msg.walk():
             if part.get_content_maintype() == 'multipart':
                 continue
             if part.get('Content-Disposition') is None:
                 continue
-            
+
             filename = part.get_filename()
             if filename and filename.lower().endswith('.pdf'):
-                # Save the PDF
+                had_pdf = True
                 filepath = os.path.join(self.upload_dir, filename)
-                
+
                 with open(filepath, 'wb') as f:
                     f.write(part.get_payload(decode=True))
-                
+
                 logging.info(f"Saved PDF: {filename}")
-                
-                # Process the PDF
+
                 try:
                     batch_id = process_new_blotter(filepath)
                     logging.info(f"Processed PDF: {filename} -> Batch #{batch_id}")
-                    pdf_count += 1
+                    any_succeeded = True
                 except Exception as e:
                     logging.error(f"Failed to process PDF {filename}: {str(e)}")
-        
-        return pdf_count
+
+        return had_pdf, any_succeeded
+
+    def _extract_body_text(self, msg) -> str:
+        """Extract plain text from email body. Prefers text/plain, falls back to stripped text/html."""
+        plain = None
+        html = None
+
+        for part in msg.walk():
+            content_type = part.get_content_type()
+            if part.get_content_maintype() == 'multipart':
+                continue
+            if content_type == 'text/plain' and plain is None:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    plain = payload.decode(part.get_content_charset() or 'utf-8', errors='replace')
+            elif content_type == 'text/html' and html is None:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    raw_html = payload.decode(part.get_content_charset() or 'utf-8', errors='replace')
+                    # Strip tags with a simple regex for fallback purposes
+                    import re as _re
+                    html = _re.sub(r'<[^>]+>', ' ', raw_html)
+                    html = _re.sub(r'\s+', ' ', html).strip()
+
+        return plain if plain is not None else (html or "")
     
     def _move_to_processed(self, mail, email_num):
         """Move processed email to Processed folder"""

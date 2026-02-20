@@ -14,6 +14,10 @@ import config
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+
+# Apply DB migrations at startup
+from init_db import migrate as _migrate
+_migrate()
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'admin_login'
@@ -124,6 +128,74 @@ def view_record(record_id):
     conn.close()
     
     return render_template('record_detail.html', record=record, logs=logs)
+
+@app.route('/posts')
+def posts():
+    """Public posts page with AI-summarized incidents"""
+    county = request.args.get('county', '')
+    city = request.args.get('city', '')
+    agency_type = request.args.get('agency_type', '')
+    q = request.args.get('q', '')
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = 20
+
+    conn = get_db()
+
+    # Build filter query
+    sql = """
+        SELECT posts.*, blotters.county as blotter_county
+        FROM posts
+        JOIN blotters ON posts.blotter_id = blotters.id
+        WHERE 1=1
+    """
+    params = []
+
+    if county:
+        sql += " AND posts.county = ?"
+        params.append(county)
+    if city:
+        sql += " AND posts.city LIKE ?"
+        params.append(f'%{city}%')
+    if agency_type:
+        sql += " AND posts.agency_type = ?"
+        params.append(agency_type)
+    if q:
+        sql += " AND (posts.title LIKE ? OR posts.summary LIKE ?)"
+        term = f'%{q}%'
+        params.extend([term, term])
+
+    # Total count
+    count_sql = f"SELECT COUNT(*) FROM ({sql})"
+    total = conn.execute(count_sql, params).fetchone()[0]
+
+    sql += " ORDER BY posts.incident_date DESC, posts.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, (page - 1) * per_page])
+    post_rows = conn.execute(sql, params).fetchall()
+
+    # Dropdown options
+    counties = [r['county'] for r in conn.execute(
+        'SELECT DISTINCT county FROM posts ORDER BY county').fetchall()]
+    cities = [r['city'] for r in conn.execute(
+        "SELECT DISTINCT city FROM posts WHERE city != '' ORDER BY city").fetchall()]
+
+    conn.close()
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    return render_template(
+        'posts.html',
+        posts=post_rows,
+        total=total,
+        page=page,
+        total_pages=total_pages,
+        counties=counties,
+        cities=cities,
+        county=county,
+        city=city,
+        agency_type=agency_type,
+        q=q,
+    )
+
 
 # ==========================================
 # ADMIN ROUTES (Login Required)

@@ -96,5 +96,69 @@ def init_database():
     print("  - records (individual incidents)")
     print("  - command_logs (detailed event logs)")
 
+def migrate():
+    """Safely apply schema changes to an existing DB without data loss"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Add source_type column to blotters if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE blotters ADD COLUMN source_type TEXT DEFAULT 'pdf'")
+        print("✅ Added source_type column to blotters")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Add file_path column to blotters if missing
+    try:
+        cursor.execute("ALTER TABLE blotters ADD COLUMN file_path TEXT")
+        print("✅ Added file_path column to blotters")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Add missing columns to records (old schema used 'incident' instead of 'incident_type')
+    for col, definition in [
+        ('incident_type', 'TEXT'),
+        ('cfs_number',    'TEXT'),
+        ('time',          'TEXT'),
+        ('officer',       'TEXT'),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE records ADD COLUMN {col} {definition}")
+            print(f"✅ Added {col} column to records")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # Create posts table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            blotter_id INTEGER NOT NULL,
+            title TEXT,
+            summary TEXT,
+            city TEXT,
+            county TEXT,
+            agency_type TEXT DEFAULT 'other',
+            agency_name TEXT,
+            incident_date TEXT,
+            incident_type TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE,
+            FOREIGN KEY (blotter_id) REFERENCES blotters(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Indexes on posts
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_county ON posts(county)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_city ON posts(city)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_agency_type ON posts(agency_type)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_incident_date ON posts(incident_date)')
+
+    conn.commit()
+    conn.close()
+    print("✅ Migration complete")
+
+
 if __name__ == "__main__":
     init_database()
+    migrate()

@@ -6,7 +6,8 @@ Replaces the old processor.py with actual parsing logic
 import sqlite3
 import os
 import logging
-from pdf_parser import BlotterParser
+from pdf_parser import BlotterParser, parse_text_blotter
+import summarizer
 
 DB_PATH = '/root/montanablotter/blotter.db'
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -57,17 +58,19 @@ def process_new_blotter(pdf_path: str, county: str = None) -> int:
         
         # Insert individual incidents
         for incident in result['incidents']:
+            incident_type_val = incident.get('incident_type') or ''
             cursor.execute('''
                 INSERT INTO records (
-                    blotter_id, cfs_number, date, time, incident_type, 
-                    location, details, county, officer
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    blotter_id, cfs_number, date, time, incident_type,
+                    incident, location, details, county, officer
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 batch_id,
                 incident.get('cfs_number'),
                 incident.get('date'),
                 incident.get('time'),
-                incident.get('incident_type'),
+                incident_type_val,
+                incident_type_val,  # legacy 'incident' column (NOT NULL)
                 incident.get('location'),
                 incident.get('details'),
                 county,
@@ -84,12 +87,100 @@ def process_new_blotter(pdf_path: str, county: str = None) -> int:
         
         conn.commit()
         logging.info(f"✅ Batch #{batch_id} complete: {result['total_count']} incidents indexed")
-        
+
+        # Generate AI posts for all new records
+        try:
+            post_count = summarizer.generate_posts(batch_id)
+            logging.info(f"Generated {post_count} posts for batch #{batch_id}")
+        except Exception as e:
+            logging.warning(f"Post generation failed for batch #{batch_id}: {e}")
+
         return batch_id
-        
+
     except Exception as e:
         conn.rollback()
         logging.error(f"Database error: {e}")
+        raise
+    finally:
+        conn.close()
+
+
+def process_text_blotter(text: str, sender_email: str = None, county: str = None) -> int:
+    """
+    Process a plain-text blotter from an email body.
+
+    Args:
+        text: Raw blotter text
+        sender_email: Sender address for agency-type detection fallback
+        county: Optional county override (auto-detected from text if omitted)
+
+    Returns:
+        blotter_id of the created blotter record
+    """
+    logging.info("Processing text blotter from email body")
+
+    result = parse_text_blotter(text)
+
+    if not county:
+        county = result['county']
+
+    logging.info(f"Text blotter: county={county}, incidents={result['total_count']}")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "INSERT INTO blotters (filename, county, incident_count, source_type) VALUES (?, ?, ?, ?)",
+            ("email-body", county, result['total_count'], "text"),
+        )
+        blotter_id = cursor.lastrowid
+        logging.info(f"Created text blotter batch #{blotter_id}")
+
+        for incident in result['incidents']:
+            incident_type_val = incident.get('incident_type') or ''
+            cursor.execute(
+                """
+                INSERT INTO records
+                    (blotter_id, cfs_number, date, time, incident_type,
+                     incident, location, details, county, officer)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    blotter_id,
+                    incident.get('cfs_number'),
+                    incident.get('date'),
+                    incident.get('time'),
+                    incident_type_val,
+                    incident_type_val,  # legacy 'incident' column (NOT NULL)
+                    incident.get('location'),
+                    incident.get('details'),
+                    county,
+                    incident.get('officer'),
+                ),
+            )
+            record_id = cursor.lastrowid
+
+            for log in incident.get('command_logs', []):
+                cursor.execute(
+                    "INSERT INTO command_logs (record_id, timestamp, officer, entry) VALUES (?, ?, ?, ?)",
+                    (record_id, log.get('timestamp'), log.get('officer'), log.get('entry')),
+                )
+
+        conn.commit()
+        logging.info(f"✅ Text blotter #{blotter_id} complete: {result['total_count']} incidents indexed")
+
+        try:
+            post_count = summarizer.generate_posts(blotter_id, sender_email=sender_email)
+            logging.info(f"Generated {post_count} posts for text blotter #{blotter_id}")
+        except Exception as e:
+            logging.warning(f"Post generation failed for text blotter #{blotter_id}: {e}")
+
+        return blotter_id
+
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Database error processing text blotter: {e}")
         raise
     finally:
         conn.close()

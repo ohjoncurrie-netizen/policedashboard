@@ -10,36 +10,41 @@ from typing import List, Dict, Optional
 
 class BlotterParser:
     """Parse police blotter PDFs into structured data"""
-    
+
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
         self.county = None
         self.incidents = []
-    
-    def parse(self) -> Dict:
-        """Main parsing method - returns structured data"""
+
+    def _extract_text(self) -> str:
+        """Extract raw text from the PDF file."""
+        full_text = ""
         with pdfplumber.open(self.pdf_path) as pdf:
-            # Extract text from all pages
-            full_text = ""
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
                     full_text += text + "\n"
-            
-            # Detect county from header
-            self.county = self._detect_county(full_text)
-            
-            # Parse incidents based on format
-            if "GCSO" in full_text or "Gallatin County" in full_text:
-                self.incidents = self._parse_gcso_format(full_text)
-            else:
-                self.incidents = self._parse_generic_format(full_text)
-        
+        return full_text
+
+    def _parse_text(self, full_text: str) -> Dict:
+        """Shared parsing logic given raw text. Returns structured data dict."""
+        self.county = self._detect_county(full_text)
+
+        if "GCSO" in full_text or "Gallatin County" in full_text:
+            self.incidents = self._parse_gcso_format(full_text)
+        else:
+            self.incidents = self._parse_generic_format(full_text)
+
         return {
             'county': self.county,
             'incidents': self.incidents,
             'total_count': len(self.incidents)
         }
+
+    def parse(self) -> Dict:
+        """Main parsing method - returns structured data"""
+        full_text = self._extract_text()
+        return self._parse_text(full_text)
     
     def _detect_county(self, text: str) -> str:
         """Extract county name from PDF header"""
@@ -173,6 +178,15 @@ class BlotterParser:
                 })
         
         return incidents
+
+
+def parse_text_blotter(text: str) -> dict:
+    """Parse a blotter from raw text (email body) without pdfplumber."""
+    parser = BlotterParser.__new__(BlotterParser)
+    parser.pdf_path = None
+    parser.county = None
+    parser.incidents = []
+    return parser._parse_text(text)
 
 
 def test_parser(pdf_path: str):
