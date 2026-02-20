@@ -1,0 +1,10 @@
+venv/
+*.db
+*.db.backup.*
+__pycache__/
+*.pyc
+uploads/
+records/
+*.log
+config.py
+.claude/

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Incident Report #{{ record.id }} | MT Blotter</title>
+</head>
+<body class="bg-slate-50 font-sans p-6 md:p-12 print:bg-white print:p-0">
+
+    <div class="max-w-4xl mx-auto">
+        <a href="/dashboard" class="inline-flex items-center gap-2 text-slate-400 hover:text-blue-600 transition mb-8 font-bold text-xs uppercase tracking-widest print:hidden">
+            <i class="fas fa-arrow-left"></i> Back to Archive
+        </a>
+
+        <div class="bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden print:shadow-none print:border-slate-200">
+            
+            <div class="p-8 md:p-12 bg-slate-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <span class="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 block">Official Public Safety Record</span>
+                    <h1 class="text-3xl font-black tracking-tighter uppercase italic">{{ record.incident }}</h1>
+                </div>
+                <div class="text-right">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase">Incident ID</p>
+                    <p class="text-xl font-mono font-black text-blue-400">#MB-{{ "%05d" | format(record.id) }}</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 border-b border-slate-100 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                <div class="p-8">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Occurred On</p>
+                    <p class="font-bold text-slate-900">{{ record.date }}</p>
+                </div>
+                <div class="p-8">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Jurisdiction</p>
+                    <p class="font-bold text-slate-900 uppercase">{{ record.county }} County, MT</p>
+                </div>
+                <div class="p-8 flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase mb-1">Status</p>
+                        <span class="text-xs font-black text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase italic">Logged</span>
+                    </div>
+                    <button onclick="window.print()" class="text-slate-300 hover:text-blue-600 transition print:hidden">
+                        <i class="fas fa-print"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-8 md:p-12 space-y-8">
+                <div>
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <span class="w-8 h-px bg-blue-600"></span> Incident Narrative
+                    </h3>
+                    <div class="text-slate-600 leading-relaxed text-lg font-medium space-y-4">
+                        {{ record.details | replace('\n', '<br>') | safe }}
+                    </div>
+                </div>
+
+                <div class="pt-12 border-t border-slate-50 flex justify-between items-end">
+                    <div class="opacity-30 flex items-center gap-2">
+                        <div class="bg-slate-900 text-white p-2 rounded-lg scale-75"><i class="fas fa-mountain"></i></div>
+                        <span class="font-black tracking-tighter text-sm uppercase">MT Blotter Verified</span>
+                    </div>
+                    <p class="text-[10px] text-slate-300 font-mono italic">Retrieved: 2026-02-13 | Source: Official Sheriff's Log</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Admin Settings | MT Blotter</title>
+</head>
+<body class="bg-slate-50 font-sans">
+    <nav class="bg-slate-900 text-white p-4 flex justify-between items-center">
+        <span class="font-bold">ADMIN COMMAND CENTER</span>
+        <div class="space-x-4">
+            <a href="/dashboard" class="text-sm bg-slate-800 px-3 py-1 rounded">Dashboard</a>
+            <a href="/logout" class="text-sm text-red-400">Logout</a>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Manual Ingestion</h3>
+                <form action="/admin/upload" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="file" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"/>
+                    <button class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold">Process PDF</button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-50">
+                <h3 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-4">Security</h3>
+                <form action="/admin/settings" method="POST" class="space-y-3">
+                    <input type="hidden" name="action" value="change_password">
+                    <input type="password" name="new_password" placeholder="New Password" class="w-full p-2 border rounded text-xs outline-none focus:ring-1 focus:ring-red-500">
+                    <button class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold">Update Admin PW</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 bg-gray-50 border-b font-bold text-sm text-slate-700">Active Subscribers</div>
+                <table class="w-full text-left text-sm">
+                    <thead class="text-[10px] text-gray-400 uppercase font-bold">
+                        <tr class="border-b">
+                            <th class="px-6 py-3">Username</th>
+                            <th class="px-6 py-3">Tier</th>
+                            <th class="px-6 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr class="border-b hover:bg-slate-50 transition">
+                            <td class="px-6 py-3 font-semibold">{{ user.username }}</td>
+                            <td class="px-6 py-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ 'bg-blue-100 text-blue-700' if user.membership == 'pro' else 'bg-gray-100 text-gray-500' }}">
+                                    {{ user.membership }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 text-right">
+                                <form action="/admin/settings" method="POST">
+                                    <input type="hidden" name="action" value="update_user">
+                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                    <select name="membership" onchange="this.form.submit()" class="text-[10px] border rounded p-1">
+                                        <option value="free" {{ 'selected' if user.membership == 'free' }}>Free</option>
+                                        <option value="pro" {{ 'selected' if user.membership == 'pro' }}>Pro</option>
+                                    </select>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 bg-slate-900 text-white font-bold text-sm">Live System Audit</div>
+                <div class="max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-[11px]">
+                        <tbody class="divide-y divide-gray-100">
+                            {% for log in logs %}
+                            <tr>
+                                <td class="px-6 py-2 text-gray-400 font-mono">{{ log.timestamp }}</td>
+                                <td class="px-6 py-2 font-bold text-slate-700">User {{ log.user_id }}</td>
+                                <td class="px-6 py-2 italic text-slate-500">{{ log.action }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Admin Command | Montana Blotter</title>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <nav class="bg-slate-900 text-white p-4 shadow-2xl flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-500/20">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <span class="font-black tracking-tighter text-xl italic uppercase">MT Blotter <span class="text-blue-400">Admin</span></span>
+        </div>
+        <div class="flex gap-4 items-center">
+            <a href="/dashboard" class="text-xs bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl transition font-bold border border-slate-700">
+                <i class="fas fa-desktop mr-1"></i> Dashboard
+            </a>
+            <a href="/logout" class="text-xs text-red-400 font-bold hover:text-red-300 transition px-2">Logout</a>
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="max-w-7xl mx-auto mt-6 px-6">
+          {% for message in messages %}
+            <div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg mb-4 text-sm font-bold flex items-center">
+                <i class="fas fa-info-circle mr-3"></i> {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        <div class="space-y-6">
+            
+            <div class="bg-slate-900 p-6 rounded-3xl text-white shadow-xl border border-slate-800">
+                <h3 class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6 flex items-center">
+                    <i class="fas fa-chart-line mr-2"></i> Financial Pulse
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Monthly Recurring (MRR)</p>
+                        <p class="text-3xl font-black">${{ "{:,.2f}".format(mrr) }}</p>
+                    </div>
+                    <div class="pt-4 border-t border-slate-800">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Total Lifetime Revenue</p>
+                        <p class="text-xl font-bold text-green-400">${{ "{:,.2f}".format(total_rev) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Manual PDF Ingestion</h3>
+                <form action="/admin/upload" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <div class="relative group border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-blue-400 transition cursor-pointer">
+                        <input type="file" name="file" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                        <i class="fas fa-file-pdf text-slate-300 text-3xl mb-2 group-hover:text-red-500 transition"></i>
+                        <p class="text-[10px] text-slate-500 font-bold uppercase">Select Record PDF</p>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-2xl text-xs font-black hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                        RUN PROCESSOR
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-red-50">
+                <h3 class="text-xs font-bold text-red-600 uppercase tracking-widest mb-4">System Status</h3>
+                <form action="/admin" method="POST">
+                    <input type="hidden" name="action" value="toggle_maintenance">
+                    <select name="status" onchange="this.form.submit()" class="w-full text-xs font-bold border-none bg-slate-50 rounded-xl p-3 focus:ring-2 focus:ring-red-500 outline-none cursor-pointer">
+                        <option value="0">🟢 SITE: LIVE</option>
+                        <option value="1">🔴 SITE: MAINTENANCE</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 space-y-8">
+            
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h2 class="font-black text-slate-800 flex items-center">
+                        <i class="fas fa-users-cog mr-2 text-blue-500"></i> Subscriber Management
+                    </h2>
+                </div>
+                <table class="w-full text-left">
+
+                    {% if current_user.username == 'admin' %}
+    <a href="/admin" class="flex items-center gap-2 bg-red-600/10 text-red-500 px-4 py-2 rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition font-bold text-xs">
+        <i class="fas fa-user-shield"></i>
+        ADMIN COMMAND
+    </a>
+{% endif %}
+                    <thead class="bg-slate-50 text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
+                        <tr>
+                            <th class="px-6 py-4">Identity</th>
+                            <th class="px-6 py-4">Membership Tier</th>
+                            <th class="px-6 py-4 text-right">Access Controls</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for user in users %}
+                        <tr class="hover:bg-blue-50/30 transition">
+                            <td class="px-6 py-4">
+                                <span class="text-sm font-black text-slate-700 block">{{ user.username }}</span>
+                                <span class="text-[10px] font-mono text-slate-400 uppercase italic">ID: {{ user.id }}</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <form action="/admin" method="POST">
+                                    <input type="hidden" name="action" value="update_user">
+                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                    <select name="membership" onchange="this.form.submit()" class="text-[10px] font-black border-none bg-slate-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer">
+                                        <option value="free" {{ 'selected' if user.membership == 'free' }}>FREE</option>
+                                        <option value="pro" {{ 'selected' if user.membership == 'pro' }}>PRO ACCESS</option>
+                                    </select>
+                                </form>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                {% if user.username != 'admin' %}
+                                <form action="/admin" method="POST" onsubmit="return confirm('WARNING: Permanently delete this user?');" class="inline">
+                                    <input type="hidden" name="action" value="delete_user">
+                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                    <button class="text-slate-300 hover:text-red-500 transition text-sm px-2">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
+                <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                    <h3 class="text-white text-xs font-black uppercase tracking-widest flex items-center">
+                        <i class="fas fa-fingerprint mr-2 text-blue-400"></i> System Audit Log
+                    </h3>
+                    <span class="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-1 rounded font-mono">LIVE FEED</span>
+                </div>
+                <div class="max-h-80 overflow-y-auto bg-slate-950/50">
+                    <table class="w-full text-[10px] text-slate-500 font-mono">
+                        <tbody class="divide-y divide-slate-900">
+                            {% for log in logs %}
+                            <tr class="hover:bg-slate-900/50">
+                                <td class="px-6 py-3 text-blue-500/80">{{ log.timestamp }}</td>
+                                <td class="px-6 py-3 font-bold text-slate-300">USER ID {{ log.user_id }}</td>
+                                <td class="px-6 py-3 italic text-slate-400">"{{ log.action }}"</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-[32px] p-6 shadow-2xl border border-slate-800 mt-8">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Email Automation Pulse</h3>
+        <span class="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+    </div>
+    
+    <div class="space-y-2 max-h-48 overflow-y-auto">
+        {% for log in automation_logs %}
+        <div class="border-l-2 border-slate-700 pl-3 py-1">
+            <p class="text-[9px] font-mono text-slate-500">{{ log.split(']')[0][1:] }}</p>
+            <p class="text-[10px] font-mono {{ 'text-red-400' if 'ERROR' in log else 'text-slate-300' }}">
+                {{ log.split(']')[1] if ']' in log else log }}
+            </p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 pb-12 mt-8">
+        <div class="bg-white p-6 rounded-3xl border border-red-100 shadow-sm max-w-sm">
+            <h3 class="text-xs font-black text-red-600 uppercase tracking-widest mb-4">Security: Update Admin Pass</h3>
+            <form action="/admin" method="POST" class="space-y-3">
+                <input type="hidden" name="action" value="change_password">
+                <input type="password" name="new_password" placeholder="New Strong Password" required 
+                       class="w-full p-3 bg-slate-50 border-none rounded-2xl text-xs focus:ring-2 focus:ring-red-500 outline-none">
+                <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-2xl text-xs font-black hover:bg-red-700 transition">
+                    UPDATE CREDENTIALS
+                </button>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

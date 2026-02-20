@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Dashboard | Montana Blotter</title>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <div class="flex min-h-screen">
+        <aside class="w-72 bg-white border-r border-slate-200 p-8 sticky top-0 h-screen">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="bg-slate-900 text-white p-2 rounded-xl"><i class="fas fa-mountain"></i></div>
+                <span class="font-black uppercase italic tracking-tighter">MT Blotter</span>
+            </div>
+
+            <nav class="space-y-6">
+                <!-- ADMIN LINK - Shows only for admin users -->
+                {% if current_user.username == 'admin' or current_user.membership == 'pro' %}
+                <a href="/admin" class="flex items-center gap-3 bg-red-600/10 text-red-600 px-4 py-3 rounded-xl border border-red-500/20 hover:bg-red-600 hover:text-white transition font-bold text-xs uppercase tracking-widest shadow-sm">
+                    <i class="fas fa-user-shield"></i>
+                    Admin Panel
+                </a>
+                {% endif %}
+                
+                <div>
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Counties</h3>
+                    <div class="space-y-1">
+                        {% for c in ['Teton', 'Cascade', 'Lewis & Clark', 'Flathead', 'Gallatin' ] %}
+                        <a href="/dashboard?county={{ c }}" 
+                           class="flex items-center justify-between px-4 py-2 rounded-xl text-sm font-bold transition {{ 'bg-slate-900 text-white' if county == c else 'text-slate-500 hover:bg-slate-50' }}">
+                            {{ c }}
+                        </a>
+                        {% endfor %}
+                        <a href="/dashboard" class="block text-center mt-4 text-[9px] font-black uppercase text-slate-300">Reset Filters</a>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-600 rounded-3xl p-6 text-white shadow-xl">
+                    <p class="text-[9px] font-black uppercase opacity-60">Total Records</p>
+                    <p class="text-3xl font-black">{{ total }}</p>
+                </div>
+                
+                <a href="/logout" class="block text-center text-xs font-bold text-slate-400 hover:text-red-500">Sign Out</a>
+            </nav>
+        </aside>
+
+        <main class="flex-grow p-10">
+            <div class="flex justify-between items-end mb-10">
+                <h2 class="text-3xl font-black tracking-tighter">{{ county if county else 'Statewide' }} <span class="text-blue-600 italic">Feed</span></h2>
+                <form action="/dashboard" method="GET" class="relative">
+                    <input type="text" name="q" value="{{ q }}" placeholder="Search names..." 
+                           class="w-64 pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-[10px]"></i>
+                </form>
+            </div>
+
+<div class="space-y-12">
+    {% for group in records|groupby('filename') %}
+    <div class="bg-white rounded-[40px] shadow-xl border border-slate-100 overflow-hidden">
+        <div class="bg-slate-900 px-10 py-4 flex justify-between items-center">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-white">
+                <i class="far fa-file-pdf mr-2 text-blue-400"></i> {{ group.grouper if group.grouper else "Manual Entries / Uncategorized" }}
+            </h3>
+            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                {{ group.list|length }} Incidents in this Batch
+            </span>
+        </div>
+
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                <tr>
+                    <th class="px-10 py-4">Incident Info</th>
+                    <th class="px-10 py-4">Details</th>
+                    <th class="px-10 py-4 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for record in group.list %}
+                <tr class="group hover:bg-blue-50/20 transition">
+                    <td class="px-10 py-6">
+                        <span class="text-[9px] font-mono text-slate-400 block mb-1 uppercase">{{ record.date }} {{ record.time if record.time else '' }}</span>
+                        <span class="text-sm font-black text-slate-800 block">{{ record.incident_type if record.incident_type else 'Incident' }}</span>
+                        <span class="text-[9px] text-slate-400 block mt-1">{{ record.location if record.location else 'Location N/A' }}</span>
+                    </td>
+                    <td class="px-10 py-6 max-w-sm">
+                        {% if current_user.membership == 'pro' or current_user.username == 'admin' %}
+                            <p class="text-xs text-slate-600 leading-relaxed font-medium">
+                                {{ record.details[:150] if record.details else "No details available" }}
+                                {% if record.details and record.details|length > 150 %}...{% endif %}
+                            </p>
+                        {% else %}
+                            <div class="relative">
+                                <p class="text-xs text-slate-300 italic blur-[4px] select-none">
+                                    Details restricted to Pro members.
+                                </p>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <a href="/plans" class="bg-blue-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase">Unlock Pro</a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-10 py-6 text-right">
+                        <a href="/record/{{ record.id }}" class="text-[10px] font-black uppercase text-slate-400 group-hover:text-blue-600 transition">View <i class="fas fa-arrow-right ml-1"></i></a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not records %}
+<div class="bg-white rounded-[40px] shadow-xl border border-slate-100 p-20 text-center">
+    <i class="fas fa-inbox text-slate-200 text-6xl mb-6"></i>
+    <h3 class="text-2xl font-black text-slate-800 mb-2">No Records Yet</h3>
+    <p class="text-slate-400 mb-8">Upload a PDF in the admin panel or run the email worker to populate data.</p>
+    {% if current_user.username == 'admin' or current_user.membership == 'pro' %}
+    <a href="/admin" class="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition">
+        Go to Admin Panel
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+        </main>
+    </div>
+
+</body>
+</html>

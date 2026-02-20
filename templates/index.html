@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Montana Blotter | Public Safety Records</title>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <!-- Header -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-900 text-white p-2.5 rounded-xl">
+                    <i class="fas fa-mountain"></i>
+                </div>
+                <div>
+                    <h1 class="font-black uppercase italic tracking-tighter text-xl">Montana Blotter</h1>
+                    <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Free Public Records</p>
+                </div>
+            </div>
+            <a href="/admin/login" class="text-xs text-slate-400 hover:text-slate-900 font-bold uppercase tracking-widest">
+                Admin
+            </a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-16 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <span class="inline-block bg-blue-500/20 text-blue-300 text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest mb-6">
+                Open Source • Free Forever
+            </span>
+            <h2 class="text-4xl md:text-6xl font-black tracking-tight mb-6 leading-tight">
+                Montana Police Blotters.<br/>
+                <span class="text-blue-400 italic">Transparent & Accessible.</span>
+            </h2>
+            <p class="text-slate-300 text-lg md:text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
+                Search thousands of public safety records from Montana sheriff's offices. No account required. No fees. Always free.
+            </p>
+        </div>
+    </section>
+
+    <!-- Search Bar -->
+    <section class="max-w-4xl mx-auto px-6 -mt-6 relative z-10">
+        <form action="/" method="GET" class="bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 flex gap-3">
+            <div class="flex-1 relative">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" 
+                       name="q" 
+                       value="{{ q if q else '' }}"
+                       placeholder="Search by incident type, location, or details..." 
+                       class="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <select name="county" 
+                    class="px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">All Counties</option>
+                {% for c in counties %}
+                <option value="{{ c }}" {{ 'selected' if county == c else '' }}>{{ c }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-sm hover:bg-blue-600 transition uppercase tracking-widest">
+                Search
+            </button>
+        </form>
+    </section>
+
+    <!-- Stats Bar -->
+    <section class="max-w-7xl mx-auto px-6 py-12">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-2xl p-6 border border-slate-100 text-center">
+                <i class="fas fa-database text-blue-500 text-3xl mb-3"></i>
+                <p class="text-3xl font-black text-slate-900">{{ total }}</p>
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Total Records</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-100 text-center">
+                <i class="fas fa-map-marked-alt text-blue-500 text-3xl mb-3"></i>
+                <p class="text-3xl font-black text-slate-900">{{ counties|length }}</p>
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Counties Covered</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-100 text-center">
+                <i class="fas fa-lock-open text-blue-500 text-3xl mb-3"></i>
+                <p class="text-3xl font-black text-slate-900">100%</p>
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mt-1">Free & Open</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Records Display -->
+    <section class="max-w-7xl mx-auto px-6 pb-20">
+        {% if records %}
+        <h3 class="text-2xl font-black text-slate-900 mb-6">
+            {% if q or county %}
+                Search Results
+            {% else %}
+                Recent Records
+            {% endif %}
+        </h3>
+
+        <div class="space-y-8">
+            {% for group in records|groupby('filename') %}
+            <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
+                <div class="bg-slate-900 px-8 py-4 flex justify-between items-center">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-white">
+                        <i class="far fa-file-pdf mr-2 text-blue-400"></i>
+                        {{ group.grouper if group.grouper else "Uncategorized" }}
+                    </h4>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                        {{ group.list|length }} Incidents
+                    </span>
+                </div>
+
+                <div class="divide-y divide-slate-50">
+                    {% for record in group.list %}
+                    <a href="/record/{{ record.id }}" class="block p-6 hover:bg-blue-50/30 transition group">
+                        <div class="flex justify-between items-start gap-6">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="text-[9px] font-mono text-slate-400 uppercase">
+                                        {{ record.date }} {{ record.time if record.time else '' }}
+                                    </span>
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-black uppercase">
+                                        {{ record.county }}
+                                    </span>
+                                </div>
+                                <h5 class="text-lg font-black text-slate-800 mb-1">
+                                    {{ record.incident_type if record.incident_type else 'Incident' }}
+                                </h5>
+                                <p class="text-sm text-slate-500 mb-2">
+                                    <i class="fas fa-map-marker-alt text-slate-300 mr-1"></i>
+                                    {{ record.location if record.location else 'Location N/A' }}
+                                </p>
+                                <p class="text-sm text-slate-600 leading-relaxed">
+                                    {{ record.details[:200] if record.details else "No details available" }}
+                                    {% if record.details and record.details|length > 200 %}...{% endif %}
+                                </p>
+                            </div>
+                            <div class="text-slate-300 group-hover:text-blue-600 transition">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="bg-white rounded-3xl p-16 text-center border border-slate-100">
+            <i class="fas fa-search text-slate-200 text-6xl mb-6"></i>
+            <h3 class="text-2xl font-black text-slate-800 mb-2">No Records Found</h3>
+            <p class="text-slate-500 mb-6">
+                {% if q or county %}
+                    Try adjusting your search terms or county filter.
+                {% else %}
+                    No records have been uploaded yet. Check back soon!
+                {% endif %}
+            </p>
+            <a href="/" class="inline-block bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-600 transition">
+                Clear Filters
+            </a>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div>
+                    <h4 class="font-black text-lg mb-4">About Montana Blotter</h4>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        A free, open-source platform aggregating police blotters from Montana sheriff's offices. Making public safety information accessible to everyone.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-black text-lg mb-4">Coverage</h4>
+                    <p class="text-slate-400 text-sm">
+                        Currently indexing records from multiple Montana counties with more being added regularly.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-black text-lg mb-4">Open Source</h4>
+                    <p class="text-slate-400 text-sm mb-3">
+                        This project is completely free and open-source. No accounts. No fees. No tracking.
+                    </p>
+                    <a href="/admin/login" class="text-blue-400 hover:text-blue-300 text-sm font-bold">
+                        Admin Login →
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-slate-800 pt-8 text-center">
+                <p class="text-slate-500 text-xs uppercase tracking-widest font-bold">
+                    &copy; 2026 Montana Blotter • Gibson Flats, MT • Free Public Records
+                </p>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

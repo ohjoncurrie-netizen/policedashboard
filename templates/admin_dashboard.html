@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Admin Dashboard | Montana Blotter</title>
+</head>
+<body class="bg-slate-50 font-sans">
+
+    <!-- Header -->
+    <nav class="bg-slate-900 text-white p-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-xl">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <span class="font-black uppercase italic">Admin Panel</span>
+            </div>
+            <div class="flex gap-4">
+                <a href="/" class="text-sm hover:text-blue-400 transition">View Public Site</a>
+                <a href="/admin/logout" class="text-sm text-red-400 hover:text-red-300 transition">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6">
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+            <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 flex items-center">
+                <i class="fas fa-check-circle mr-2"></i> {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <h1 class="text-3xl font-black text-slate-900 mb-8">Dashboard Overview</h1>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <i class="fas fa-database text-blue-500 text-3xl"></i>
+                </div>
+                <p class="text-3xl font-black text-slate-900">{{ total_records }}</p>
+                <p class="text-sm text-slate-500 font-bold uppercase tracking-wider mt-1">Total Records</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <i class="fas fa-file-pdf text-blue-500 text-3xl"></i>
+                </div>
+                <p class="text-3xl font-black text-slate-900">{{ total_blotters }}</p>
+                <p class="text-sm text-slate-500 font-bold uppercase tracking-wider mt-1">PDF Blotters</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <i class="fas fa-map-marked-alt text-blue-500 text-3xl"></i>
+                </div>
+                <p class="text-3xl font-black text-slate-900">{{ total_counties }}</p>
+                <p class="text-sm text-slate-500 font-bold uppercase tracking-wider mt-1">Counties</p>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <a href="/admin/upload" class="bg-blue-600 text-white p-6 rounded-2xl hover:bg-blue-700 transition shadow-lg">
+                <i class="fas fa-upload text-2xl mb-3 block"></i>
+                <p class="font-black text-lg">Upload PDF</p>
+                <p class="text-sm opacity-80 mt-1">Process a new police blotter</p>
+            </a>
+
+            <a href="/admin/blotters" class="bg-slate-900 text-white p-6 rounded-2xl hover:bg-slate-800 transition shadow-lg">
+                <i class="fas fa-folder-open text-2xl mb-3 block"></i>
+                <p class="font-black text-lg">Manage Blotters</p>
+                <p class="text-sm opacity-80 mt-1">View and delete blotters</p>
+            </a>
+
+            <a href="/admin/emails" class="bg-purple-600 text-white p-6 rounded-2xl hover:bg-purple-700 transition shadow-lg">
+                <i class="fas fa-envelope text-2xl mb-3 block"></i>
+                <p class="font-black text-lg">Email Management</p>
+                <p class="text-sm opacity-80 mt-1">Send to sheriffs offices</p>
+            </a>
+
+            <a href="/admin/settings" class="bg-white border border-slate-200 text-slate-900 p-6 rounded-2xl hover:bg-slate-50 transition">
+                <i class="fas fa-cog text-2xl mb-3 block text-slate-600"></i>
+                <p class="font-black text-lg">Settings</p>
+                <p class="text-sm text-slate-500 mt-1">Change admin password</p>
+            </a>
+        </div>
+
+        <!-- Recent Blotters -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-8">
+            <div class="p-6 border-b border-slate-100 bg-slate-50">
+                <h2 class="font-black text-lg">Recent Blotters</h2>
+            </div>
+            <table class="w-full">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500 font-bold">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Filename</th>
+                        <th class="px-6 py-3 text-left">County</th>
+                        <th class="px-6 py-3 text-left">Upload Date</th>
+                        <th class="px-6 py-3 text-right">Incidents</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for blotter in recent_blotters %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-4 text-sm font-bold">{{ blotter.filename }}</td>
+                        <td class="px-6 py-4 text-sm">{{ blotter.county }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-500">{{ blotter.upload_date }}</td>
+                        <td class="px-6 py-4 text-sm text-right font-bold">{{ blotter.incident_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- County Breakdown -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 bg-slate-50">
+                <h2 class="font-black text-lg">County Breakdown</h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-3">
+                    {% for stat in county_stats %}
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                        <span class="font-bold text-slate-900">{{ stat.county }}</span>
+                        <span class="text-sm text-slate-500">{{ stat.count }} records</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
