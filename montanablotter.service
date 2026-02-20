@@ -1,0 +1,15 @@
+[Unit]
+Description=Montana Blotter Flask App
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/montanablotter
+ExecStart=/root/montanablotter/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 app:app
+Restart=always
+RestartSec=5
+StandardOutput=append:/root/montanablotter/gunicorn.log
+StandardError=append:/root/montanablotter/gunicorn.log
+
+[Install]
+WantedBy=multi-user.target

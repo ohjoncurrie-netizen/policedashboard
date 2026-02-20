@@ -1,55 +1,74 @@
+"""
+Morning Briefing - emails a daily digest of yesterday's posts to the admin.
+Runs daily at 7am via cron.
+"""
+
 import sqlite3
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
-# --- CONFIGURATION ---
-DB_PATH = "/root/montanablotter/records_metadata.db"
-EMAIL_USER = "juan@fertherecerd.com"
-EMAIL_PASS = "Lol123lol!!"  # The same 16-character code used before
+import config
+
 RECIPIENT_EMAIL = "ohjoncurrie@gmail.com"
 
-def get_daily_summaries():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    # We fetch records from the last 24 hours
-    # Note: This assumes you added a 'timestamp' column or we just pull the latest 10
-    query = "SELECT filename, summary FROM summaries ORDER BY id DESC LIMIT 10"
-    records = conn.execute(query).fetchall()
-    conn.close()
-    return records
 
-def send_briefing(records):
-    if not records:
-        print("No new records to report today.")
+def get_yesterdays_posts():
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    posts = conn.execute(
+        """
+        SELECT p.title, p.summary, p.agency_name, p.county, p.incident_date
+        FROM posts p
+        WHERE p.incident_date = ? OR DATE(p.created_at) = ?
+        ORDER BY p.incident_date, p.created_at
+        """,
+        (yesterday, yesterday),
+    ).fetchall()
+    conn.close()
+    return posts, yesterday
+
+
+def send_briefing(posts, date_str):
+    if not posts:
+        print(f"No new posts for {date_str} — skipping briefing email.")
         return
 
-    # Build HTML Email Body
-    html = f"<h2>🏔️ Montana Blotter: Morning Briefing</h2>"
-    html += f"<p>Date: {datetime.now().strftime('%Y-%m-%d')}</p><hr>"
-    
-    for rec in records:
-        html += f"<h3>📄 {rec['filename']}</h3>"
-        html += f"<p>{rec['summary'].replace('\n', '<br>')}</p><br>"
+    html = f"""
+    <h2>Montana Blotter: Morning Briefing</h2>
+    <p><strong>Date:</strong> {datetime.now().strftime('%B %d, %Y')}</p>
+    <p>{len(posts)} report(s) from {date_str}</p>
+    <hr>
+    """
 
-    msg = MIMEMultipart()
-    msg['Subject'] = f"Montana Blotter Briefing - {datetime.now().strftime('%b %d')}"
-    msg['From'] = EMAIL_USER
+    for post in posts:
+        agency = post['agency_name'] or post['county'] or 'Unknown Agency'
+        summary_html = (post['summary'] or '').replace('\n', '<br>')
+        html += f"""
+        <h3>{post['title'] or 'Daily Activity Report'}</h3>
+        <p style="color:#666;font-size:13px;">{agency} &mdash; {post['incident_date'] or date_str}</p>
+        <p>{summary_html}</p>
+        <hr>
+        """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = f"Montana Blotter Briefing – {datetime.now().strftime('%b %d, %Y')}"
+    msg['From'] = config.EMAIL_USER
     msg['To'] = RECIPIENT_EMAIL
     msg.attach(MIMEText(html, 'html'))
 
-    # Send via Gmail SMTP
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, RECIPIENT_EMAIL, msg.as_string())
-        print("Briefing sent successfully!")
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
+            server.starttls()
+            server.login(config.EMAIL_USER, config.EMAIL_PASSWORD)
+            server.sendmail(config.EMAIL_USER, RECIPIENT_EMAIL, msg.as_string())
+        print(f"Briefing sent to {RECIPIENT_EMAIL} ({len(posts)} posts)")
     except Exception as e:
         print(f"Error sending briefing: {e}")
 
+
 if __name__ == "__main__":
-    latest_records = get_daily_summaries()
-    send_briefing(latest_records)
-
-
+    posts, date_str = get_yesterdays_posts()
+    send_briefing(posts, date_str)
