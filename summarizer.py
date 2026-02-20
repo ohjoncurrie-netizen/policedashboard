@@ -20,27 +20,40 @@ logger = logging.getLogger(__name__)
 # Agency detection
 # ---------------------------------------------------------------------------
 
-def _detect_agency(content: str, sender_email: str = None) -> tuple[str, str]:
+def _detect_agency(content: str, sender_email: str = None,
+                   filename: str = None, county: str = None) -> tuple[str, str]:
     """
-    Return (agency_type, agency_name) from content then sender_email fallback.
+    Return (agency_type, agency_name) by checking filename first, then
+    content keywords, then sender_email.
     agency_type: 'sheriff' | 'police' | 'other'
     """
+    # Known agency abbreviations in filenames
+    fname = (filename or "").upper()
+    if "GCSO" in fname:
+        return "sheriff", f"{county or 'Gallatin'} County Sheriff's Office"
+    if "LCSO" in fname:
+        return "sheriff", f"{county or 'Lewis and Clark'} County Sheriff's Office"
+    if re.search(r'\bSO\b', fname):          # e.g. "MTSO", "YCSO"
+        return "sheriff", f"{county or ''} County Sheriff's Office".strip()
+    if re.search(r'\bPD\b', fname):
+        return "police", f"{county or ''} Police Department".strip()
+
     content_upper = content.upper() if content else ""
 
     if "SHERIFF" in content_upper:
         m = re.search(r"([A-Za-z\s]+(?:County)?\s+Sheriff(?:'?s)?\s+Office)", content, re.IGNORECASE)
-        return "sheriff", (m.group(1).strip() if m else "Sheriff's Office")
+        return "sheriff", (m.group(1).strip() if m else f"{county or ''} Sheriff's Office".strip())
 
     if "POLICE DEPARTMENT" in content_upper or re.search(r'\bPD\b', content or ""):
         m = re.search(r"([A-Za-z\s]+Police\s+Department)", content, re.IGNORECASE)
-        return "police", (m.group(1).strip() if m else "Police Department")
+        return "police", (m.group(1).strip() if m else f"{county or ''} Police Department".strip())
 
     if sender_email:
         local = sender_email.split("@")[0].lower()
         if "sheriff" in local:
-            return "sheriff", "Sheriff's Office"
+            return "sheriff", f"{county or ''} Sheriff's Office".strip()
         if local in ("pd", "police"):
-            return "police", "Police Department"
+            return "police", f"{county or ''} Police Department".strip()
 
     return "other", ""
 
@@ -82,10 +95,11 @@ def generate_posts(blotter_id: int, sender_email: str = None) -> int:
 
     # Fetch blotter metadata
     blotter_row = cursor.execute(
-        "SELECT county, upload_date FROM blotters WHERE id = ?", (blotter_id,)
+        "SELECT county, upload_date, filename FROM blotters WHERE id = ?", (blotter_id,)
     ).fetchone()
     blotter_county = blotter_row["county"] if blotter_row else "Unknown"
     blotter_date = (blotter_row["upload_date"] or "")[:10] if blotter_row else ""
+    blotter_filename = blotter_row["filename"] if blotter_row else ""
 
     # Fetch all records for this blotter, sorted chronologically
     rows = cursor.execute(
@@ -118,7 +132,9 @@ def generate_posts(blotter_id: int, sender_email: str = None) -> int:
     combined_text = " ".join(
         f"{r['incident_type']} {r['location']} {r['details']}" for r in rows
     )
-    agency_type, agency_name = _detect_agency(combined_text, sender_email)
+    agency_type, agency_name = _detect_agency(
+        combined_text, sender_email, filename=blotter_filename, county=county
+    )
 
     # Format incident list for Claude
     incident_lines = []
@@ -135,6 +151,7 @@ def generate_posts(blotter_id: int, sender_email: str = None) -> int:
         date=incident_date,
         agency_type=agency_type,
         agency_name=agency_name,
+        filename=blotter_filename,
         incident_lines=incident_lines,
     )
 
@@ -172,7 +189,7 @@ def generate_posts(blotter_id: int, sender_email: str = None) -> int:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _call_claude(client, county, date, agency_type, agency_name, incident_lines) -> dict:
+def _call_claude(client, county, date, agency_type, agency_name, filename, incident_lines) -> dict:
     """
     Call Claude to produce a single daily digest post.
     Returns dict with keys: title, summary, city, agency_type, agency_name.
@@ -186,6 +203,8 @@ def _call_claude(client, county, date, agency_type, agency_name, incident_lines)
     user_content = f"""Write a daily police activity report for publication.
 
 Agency: {agency_label}
+Agency type: {agency_type}
+Source file: {filename}
 Date: {date}
 County: {county}
 
