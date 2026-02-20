@@ -128,11 +128,11 @@ def migrate():
         except sqlite3.OperationalError:
             pass  # Column already exists
 
-    # Create posts table
+    # Recreate posts table with record_id nullable (posts are now blotter-level digests)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            record_id INTEGER NOT NULL,
+            record_id INTEGER,
             blotter_id INTEGER NOT NULL,
             title TEXT,
             summary TEXT,
@@ -143,10 +143,33 @@ def migrate():
             incident_date TEXT,
             incident_type TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE,
             FOREIGN KEY (blotter_id) REFERENCES blotters(id) ON DELETE CASCADE
         )
     ''')
+    # If old posts table had NOT NULL on record_id, drop and recreate it
+    record_id_col = cursor.execute(
+        "SELECT [notnull] FROM pragma_table_info('posts') WHERE name='record_id'"
+    ).fetchone()
+    if record_id_col and record_id_col[0] == 1:
+        print("Recreating posts table (removing NOT NULL on record_id)...")
+        cursor.execute('DROP TABLE posts')
+        cursor.execute('''
+            CREATE TABLE posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_id INTEGER,
+                blotter_id INTEGER NOT NULL,
+                title TEXT,
+                summary TEXT,
+                city TEXT,
+                county TEXT,
+                agency_type TEXT DEFAULT 'other',
+                agency_name TEXT,
+                incident_date TEXT,
+                incident_type TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (blotter_id) REFERENCES blotters(id) ON DELETE CASCADE
+            )
+        ''')
 
     # Indexes on posts
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_county ON posts(county)')

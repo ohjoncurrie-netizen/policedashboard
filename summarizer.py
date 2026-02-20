@@ -1,5 +1,5 @@
 """
-Summarizer - Uses Claude to generate readable posts from blotter records.
+Summarizer - Uses Claude to generate a single daily digest post per blotter.
 
 REQUIREMENT: config.py must contain:
     ANTHROPIC_API_KEY = 'sk-ant-...'
@@ -15,32 +15,26 @@ import config
 DB_PATH = config.DB_PATH
 logger = logging.getLogger(__name__)
 
+
 # ---------------------------------------------------------------------------
 # Agency detection
 # ---------------------------------------------------------------------------
 
 def _detect_agency(content: str, sender_email: str = None) -> tuple[str, str]:
     """
-    Return (agency_type, agency_name) by inspecting content then sender_email.
-
+    Return (agency_type, agency_name) from content then sender_email fallback.
     agency_type: 'sheriff' | 'police' | 'other'
-    agency_name: best human-readable name found, or empty string
     """
     content_upper = content.upper() if content else ""
 
-    # Content-first detection
     if "SHERIFF" in content_upper:
-        # Try to extract a proper name like "Gallatin County Sheriff's Office"
         m = re.search(r"([A-Za-z\s]+(?:County)?\s+Sheriff(?:'?s)?\s+Office)", content, re.IGNORECASE)
-        agency_name = m.group(1).strip() if m else "Sheriff's Office"
-        return "sheriff", agency_name
+        return "sheriff", (m.group(1).strip() if m else "Sheriff's Office")
 
-    if "POLICE DEPARTMENT" in content_upper or re.search(r'\bPD\b', content):
+    if "POLICE DEPARTMENT" in content_upper or re.search(r'\bPD\b', content or ""):
         m = re.search(r"([A-Za-z\s]+Police\s+Department)", content, re.IGNORECASE)
-        agency_name = m.group(1).strip() if m else "Police Department"
-        return "police", agency_name
+        return "police", (m.group(1).strip() if m else "Police Department")
 
-    # Fall back to sender email
     if sender_email:
         local = sender_email.split("@")[0].lower()
         if "sheriff" in local:
@@ -57,214 +51,193 @@ def _detect_agency(content: str, sender_email: str = None) -> tuple[str, str]:
 
 def generate_posts(blotter_id: int, sender_email: str = None) -> int:
     """
-    Generate AI-summarized posts for all records in blotter_id that don't
-    already have a post.  Returns number of posts created.
+    Generate one daily digest post for the blotter if one doesn't exist yet.
+    Returns 1 if created, 0 if already exists or no records found.
 
-    Requires config.ANTHROPIC_API_KEY to be set.
-    Falls back to a simple post on any Claude API failure so the pipeline
-    never blocks.
+    Requires config.ANTHROPIC_API_KEY.
+    Falls back to a plain-text digest on any Claude API failure.
     """
     try:
         import anthropic
         api_key = getattr(config, "ANTHROPIC_API_KEY", None)
+        client = anthropic.Anthropic(api_key=api_key) if api_key else None
         if not api_key:
-            logger.warning("ANTHROPIC_API_KEY not set in config.py – using fallback posts")
-            client = None
-        else:
-            client = anthropic.Anthropic(api_key=api_key)
+            logger.warning("ANTHROPIC_API_KEY not set – using fallback digest")
     except ImportError:
-        logger.warning("anthropic package not installed – using fallback posts")
+        logger.warning("anthropic not installed – using fallback digest")
         client = None
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Records for this blotter that don't yet have a post.
-    # COALESCE handles old schema ('incident') and new schema ('incident_type').
+    # Skip if a post already exists for this blotter
+    existing = cursor.execute(
+        "SELECT id FROM posts WHERE blotter_id = ?", (blotter_id,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        logger.info(f"Post already exists for blotter {blotter_id} – skipping")
+        return 0
+
+    # Fetch blotter metadata
+    blotter_row = cursor.execute(
+        "SELECT county, upload_date FROM blotters WHERE id = ?", (blotter_id,)
+    ).fetchone()
+    blotter_county = blotter_row["county"] if blotter_row else "Unknown"
+    blotter_date = (blotter_row["upload_date"] or "")[:10] if blotter_row else ""
+
+    # Fetch all records for this blotter, sorted chronologically
     rows = cursor.execute(
         """
         SELECT
-            r.id,
-            r.blotter_id,
             COALESCE(r.incident_type, r.incident, '') AS incident_type,
             r.location,
             r.date,
-            COALESCE(r.time, '')   AS time,
+            COALESCE(r.time, '') AS time,
             r.county,
             COALESCE(r.officer, '') AS officer,
             COALESCE(r.details, r.summary, '') AS details
         FROM records r
-        LEFT JOIN posts p ON p.record_id = r.id
         WHERE r.blotter_id = ?
-          AND p.id IS NULL
+        ORDER BY r.date, r.time
         """,
         (blotter_id,),
     ).fetchall()
 
-    # Also fetch county from blotter for agency detection fallback
-    blotter_row = cursor.execute(
-        "SELECT county FROM blotters WHERE id = ?", (blotter_id,)
-    ).fetchone()
-    blotter_county = blotter_row["county"] if blotter_row else "Unknown"
+    if not rows:
+        conn.close()
+        logger.info(f"No records for blotter {blotter_id} – nothing to post")
+        return 0
 
-    created = 0
-    for row in rows:
-        record_id = row["id"]
-        incident_type = row["incident_type"] or "Unknown Incident"
-        location = row["location"] or ""
-        date = row["date"] or ""
-        time = row["time"] or ""
-        county = row["county"] or blotter_county
-        officer = row["officer"] or ""
-        details = row["details"] or ""
+    # Determine county and date from first record
+    county = rows[0]["county"] or blotter_county
+    incident_date = rows[0]["date"] or blotter_date
 
-        # Fetch command log entries
-        logs = cursor.execute(
-            "SELECT timestamp, officer, entry FROM command_logs WHERE record_id = ? ORDER BY timestamp",
-            (record_id,),
-        ).fetchall()
-        log_lines = "\n".join(
-            f"  [{lg['timestamp']}] {lg['officer']}: {lg['entry']}" for lg in logs
-        )
+    # Build combined text for agency detection
+    combined_text = " ".join(
+        f"{r['incident_type']} {r['location']} {r['details']}" for r in rows
+    )
+    agency_type, agency_name = _detect_agency(combined_text, sender_email)
 
-        combined_text = f"{incident_type} {location} {details} {log_lines}"
-        agency_type, agency_name = _detect_agency(combined_text, sender_email)
+    # Format incident list for Claude
+    incident_lines = []
+    for r in rows:
+        time_str = r["time"] or ""
+        itype = r["incident_type"] or "Unknown"
+        loc = r["location"] or ""
+        detail = r["details"] or ""
+        incident_lines.append(f"- {time_str}  {itype}  |  {loc}  |  {detail}".strip(" |"))
 
-        post_data = _call_claude(
-            client=client,
-            incident_type=incident_type,
-            location=location,
-            date=date,
-            time=time,
-            county=county,
-            officer=officer,
-            details=details,
-            log_lines=log_lines,
-            fallback_agency_type=agency_type,
-            fallback_agency_name=agency_name,
-        )
+    post_data = _call_claude(
+        client=client,
+        county=county,
+        date=incident_date,
+        agency_type=agency_type,
+        agency_name=agency_name,
+        incident_lines=incident_lines,
+    )
 
-        # Infer city from location (first meaningful token)
-        city = post_data.get("city") or _city_from_location(location)
+    final_agency_type = post_data.get("agency_type") or agency_type
+    final_agency_name = post_data.get("agency_name") or agency_name
+    city = post_data.get("city") or ""
 
-        # Override agency fields if Claude provided them
-        final_agency_type = post_data.get("agency_type") or agency_type
-        final_agency_name = post_data.get("agency_name") or agency_name
-
-        cursor.execute(
-            """
-            INSERT INTO posts
-                (record_id, blotter_id, title, summary, city, county,
-                 agency_type, agency_name, incident_date, incident_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                record_id,
-                blotter_id,
-                post_data.get("title") or incident_type,
-                post_data.get("summary") or details,
-                city,
-                county,
-                final_agency_type,
-                final_agency_name,
-                date,
-                incident_type,
-            ),
-        )
-        created += 1
+    cursor.execute(
+        """
+        INSERT INTO posts
+            (blotter_id, title, summary, city, county,
+             agency_type, agency_name, incident_date, incident_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            blotter_id,
+            post_data.get("title") or f"Daily Activity Report – {final_agency_name or county}",
+            post_data.get("summary") or _fallback_summary(agency_name, rows),
+            city,
+            county,
+            final_agency_type,
+            final_agency_name,
+            incident_date,
+            "Daily Digest",
+        ),
+    )
 
     conn.commit()
     conn.close()
-    logger.info(f"generate_posts(blotter_id={blotter_id}): created {created} posts")
-    return created
+    logger.info(f"generate_posts(blotter_id={blotter_id}): created 1 digest post")
+    return 1
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _call_claude(
-    client,
-    incident_type,
-    location,
-    date,
-    time,
-    county,
-    officer,
-    details,
-    log_lines,
-    fallback_agency_type,
-    fallback_agency_name,
-) -> dict:
+def _call_claude(client, county, date, agency_type, agency_name, incident_lines) -> dict:
     """
-    Call Claude to summarize one incident.  Returns a dict with keys:
-    title, summary, city, agency_type, agency_name.
-    Falls back gracefully on any error.
+    Call Claude to produce a single daily digest post.
+    Returns dict with keys: title, summary, city, agency_type, agency_name.
     """
     if client is None:
-        return _fallback_post(incident_type, details, fallback_agency_type, fallback_agency_name)
+        return {}
 
-    user_content = f"""Incident details to summarize:
+    agency_label = agency_name or f"{county} County {'Sheriff' if agency_type == 'sheriff' else 'Police'}"
+    incidents_block = "\n".join(incident_lines)
 
-Type: {incident_type}
-Location: {location}
-Date/Time: {date} {time}
+    user_content = f"""Write a daily police activity report for publication.
+
+Agency: {agency_label}
+Date: {date}
 County: {county}
-Officer: {officer}
-Details: {details}
 
-Command log:
-{log_lines if log_lines else '(none)'}
+Incidents (time | type | location | details):
+{incidents_block}
 
-Return ONLY a JSON object with these exact keys:
+Format the summary exactly like this example — a short intro sentence, then one bullet per notable incident with the time and a plain-English description:
+
+"The [Agency Name] responded to a variety of incidents throughout the day. Below is a summary of notable events:
+
+[HH:MM AM/PM] – [Plain English description of incident and location.]
+[HH:MM AM/PM] – [Plain English description of incident and location.]
+..."
+
+Skip purely administrative entries (voicemails, callbacks, no-answer checks).
+Use natural times like "8:20 AM" not raw timestamps.
+Keep each bullet to one sentence.
+
+Return ONLY valid JSON with these keys:
 {{
-  "title": "short headline (10 words max)",
-  "summary": "2-3 sentence plain-English summary for a news reader",
-  "city": "city or town name extracted from location, or empty string",
+  "title": "Daily Police Activity Report – [Agency Name]",
+  "summary": "[the full formatted report as described above]",
+  "city": "primary city or town if determinable, else empty string",
   "agency_type": "sheriff or police or other",
-  "agency_name": "full agency name, e.g. Gallatin County Sheriff's Office"
+  "agency_name": "full agency name"
 }}"""
 
     try:
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=512,
+            max_tokens=1024,
             system=(
-                "You are a journalist assistant that summarizes police blotter incidents "
-                "into short, factual, readable posts for a public news site. "
-                "Respond with valid JSON only."
+                "You are a journalist writing daily police activity summaries for a public news site. "
+                "Write clearly and factually. Respond with valid JSON only."
             ),
             messages=[{"role": "user", "content": user_content}],
         )
         raw = message.content[0].text.strip()
-        # Strip markdown code fences if present
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
-        data = json.loads(raw)
-        return data
+        return json.loads(raw)
     except Exception as e:
-        logger.warning(f"Claude API error: {e} – using fallback post")
-        return _fallback_post(incident_type, details, fallback_agency_type, fallback_agency_name)
+        logger.warning(f"Claude API error: {e} – using fallback digest")
+        return {}
 
 
-def _fallback_post(incident_type, details, agency_type, agency_name) -> dict:
-    return {
-        "title": incident_type,
-        "summary": details or incident_type,
-        "city": "",
-        "agency_type": agency_type or "other",
-        "agency_name": agency_name or "",
-    }
-
-
-def _city_from_location(location: str) -> str:
-    """Best-effort city extraction from a location string."""
-    if not location:
-        return ""
-    # Strip unit/apt suffixes, take first meaningful segment
-    parts = re.split(r"[,;/]", location)
-    candidate = parts[0].strip()
-    # Remove leading numbers (street addresses)
-    candidate = re.sub(r"^\d+\s+", "", candidate)
-    return candidate[:80]
+def _fallback_summary(agency_name: str, rows) -> str:
+    """Plain-text digest when Claude is unavailable."""
+    lines = [f"The {agency_name or 'agency'} responded to the following incidents:"]
+    for r in rows:
+        time_str = r["time"] or ""
+        itype = r["incident_type"] or "Incident"
+        loc = r["location"] or ""
+        lines.append(f"{time_str} – {itype}" + (f" at {loc}" if loc else ""))
+    return "\n".join(lines)
