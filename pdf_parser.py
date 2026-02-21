@@ -32,6 +32,8 @@ class BlotterParser:
 
         if "GCSO" in full_text or "Gallatin County" in full_text:
             self.incidents = self._parse_gcso_format(full_text)
+        elif re.search(r'Helena Police|HPD Officers responded|helenamt\.gov', full_text, re.IGNORECASE):
+            self.incidents = self._parse_helena_format(full_text)
         else:
             self.incidents = self._parse_generic_format(full_text)
 
@@ -48,20 +50,23 @@ class BlotterParser:
     
     def _detect_county(self, text: str) -> str:
         """Extract county name from PDF header"""
-        # Look for common patterns
+        # Helena Police Department is in Lewis and Clark County
+        if re.search(r'Helena Police|helenamt\.gov|Helena Police Department', text, re.IGNORECASE):
+            return "Lewis and Clark"
+
         county_patterns = [
             r"(\w+)\s+County\s+Sheriff",
             r"GCSO",  # Gallatin County Sheriff's Office
             r"(\w+)\s+County",
         ]
-        
+
         for pattern in county_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 if pattern == r"GCSO":
                     return "Gallatin"
                 return match.group(1)
-        
+
         return "Unknown"
     
     def _parse_gcso_format(self, text: str) -> List[Dict]:
@@ -142,6 +147,125 @@ class BlotterParser:
         
         return " ".join(narratives) if narratives else (command_logs[-1]['entry'] if command_logs else "")
     
+    def _parse_helena_format(self, text: str) -> List[Dict]:
+        """Parse Helena Police Department press release format.
+
+        Handles two variants:
+          Format 1: '8:20 AM – A theft was reported near the 3100 block of...'
+          Format 2: '1008 hours, an Officer responded to the 1800 block of...'
+        """
+        incidents = []
+
+        # Extract date from email body
+        date_str = None
+        month_match = re.search(
+            r'(January|February|March|April|May|June|July|August|September|October|November|December)'
+            r'\s+(\d{1,2}),?\s+(\d{4})', text, re.IGNORECASE)
+        if month_match:
+            try:
+                dt = datetime.strptime(
+                    f"{month_match.group(1)} {month_match.group(2)} {month_match.group(3)}", "%B %d %Y")
+                date_str = dt.strftime('%m/%d/%y')
+            except ValueError:
+                pass
+        if not date_str:
+            slash_match = re.search(r'\b(\d{1,2}/\d{1,2}/\d{4})\b', text)
+            if slash_match:
+                try:
+                    dt = datetime.strptime(slash_match.group(1), '%m/%d/%Y')
+                    date_str = dt.strftime('%m/%d/%y')
+                except ValueError:
+                    pass
+        if not date_str:
+            date_str = datetime.now().strftime('%m/%d/%y')
+
+        # Format 1: "8:20 AM – Description"
+        # The dash separator may be en-dash, em-dash, or a replacement char
+        fmt1 = re.compile(
+            r'^(\d{1,2}:\d{2}\s+[AP]M)\s+\S\s+(.+)$',
+            re.IGNORECASE | re.MULTILINE)
+        for m in fmt1.finditer(text):
+            time_val = m.group(1).strip()
+            description = m.group(2).strip()
+            incidents.append({
+                'cfs_number': None,
+                'date': date_str,
+                'time': time_val,
+                'location': self._extract_hpd_location(description),
+                'incident_type': self._classify_hpd_incident(description),
+                'details': description,
+                'officer': None,
+                'command_logs': [],
+            })
+
+        # Format 2: "1008 hours, an Officer responded to..."  (military time bullets)
+        if not incidents:
+            fmt2 = re.compile(r'^(\d{4})\s+hours?,\s+(.+?)(?=^\d{4}\s+hours?|$)',
+                              re.IGNORECASE | re.MULTILINE | re.DOTALL)
+            for m in fmt2.finditer(text):
+                raw_time = m.group(1)
+                description = re.sub(r'\s+', ' ', m.group(2)).strip()
+                try:
+                    dt = datetime.strptime(raw_time, '%H%M')
+                    time_val = dt.strftime('%-I:%M %p')
+                except ValueError:
+                    time_val = raw_time
+                incidents.append({
+                    'cfs_number': None,
+                    'date': date_str,
+                    'time': time_val,
+                    'location': self._extract_hpd_location(description),
+                    'incident_type': self._classify_hpd_incident(description),
+                    'details': description,
+                    'officer': None,
+                    'command_logs': [],
+                })
+
+        return incidents
+
+    @staticmethod
+    def _extract_hpd_location(description: str) -> str:
+        """Pull 'XXXX block of Street' from HPD incident description."""
+        m = re.search(
+            r'(?:near|to|at|around)\s+(?:the\s+)?(\d+\s+block\s+of\s+[\w\s]+?'
+            r'(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Circle|Gulch|Ct|Pl|Hwy|Highway)\.?)',
+            description, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        return "Helena, MT"
+
+    @staticmethod
+    def _classify_hpd_incident(description: str) -> str:
+        """Derive a short incident type label from free-text description."""
+        d = description.lower()
+        if any(w in d for w in ['theft', 'shoplift', 'stolen']):
+            return 'Theft'
+        if 'assault' in d:
+            return 'Assault'
+        if 'domestic' in d:
+            return 'Domestic Disturbance'
+        if 'warrant' in d:
+            return 'Warrant Arrest'
+        if any(w in d for w in ['accident', 'crash', 'collision']):
+            return 'Accident'
+        if 'trespass' in d:
+            return 'Trespassing'
+        if any(w in d for w in ['drug', 'marijuana', 'mip', 'narcotic']):
+            return 'Drug/Narcotic'
+        if any(w in d for w in ['disturbance', 'disorderly']):
+            return 'Disturbance'
+        if any(w in d for w in ['protection order', 'protective order']):
+            return 'Protection Order'
+        if any(w in d for w in ['welfare check', 'welfare']):
+            return 'Welfare Check'
+        if any(w in d for w in ['suspicious', 'suspicious person']):
+            return 'Suspicious Activity'
+        if 'fraud' in d:
+            return 'Fraud'
+        if 'vehicle' in d:
+            return 'Vehicle'
+        return 'Police Incident'
+
     def _parse_generic_format(self, text: str) -> List[Dict]:
         """Fallback parser for non-GCSO formats"""
         incidents = []

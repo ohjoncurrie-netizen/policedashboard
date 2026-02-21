@@ -49,11 +49,29 @@ def _detect_agency(content: str, sender_email: str = None,
         return "police", (m.group(1).strip() if m else f"{county or ''} Police Department".strip())
 
     if sender_email:
-        local = sender_email.split("@")[0].lower()
-        if "sheriff" in local:
-            return "sheriff", f"{county or ''} Sheriff's Office".strip()
-        if local in ("pd", "police"):
-            return "police", f"{county or ''} Police Department".strip()
+        # Handle "Display Name <user@domain>" format
+        addr_match = re.search(r'[\w.+-]+@[\w.-]+', sender_email)
+        if addr_match:
+            addr = addr_match.group(0).lower()
+            local, domain = addr.split('@', 1)
+            if 'sheriff' in local or 'sheriff' in domain:
+                return "sheriff", f"{county or ''} Sheriff's Office".strip()
+            if 'police' in local or 'pd' == local:
+                return "police", f"{county or ''} Police Department".strip()
+            # City email domains (helenamt.gov, greatfallsmt.gov, etc.) indicate city police
+            city_match = re.match(r'([a-z]+)mt\.gov', domain)
+            if city_match:
+                city_name = city_match.group(1).replace('greatfalls', 'Great Falls') \
+                    .replace('helena', 'Helena').replace('missoula', 'Missoula') \
+                    .replace('billings', 'Billings').replace('bozeman', 'Bozeman') \
+                    .replace('havre', 'Havre').replace('kalispell', 'Kalispell')
+                city_name = city_name.title() if city_name == city_match.group(1) else city_name
+                return "police", f"{city_name} Police Department"
+            # ci.<city>.mt.us or ci.<city>.<state>.us patterns
+            city_match2 = re.match(r'ci\.([^.]+)\.', domain)
+            if city_match2:
+                city_name = city_match2.group(1).replace('-', ' ').title()
+                return "police", f"{city_name} Police Department"
 
     return "other", ""
 
