@@ -6,6 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <title>Montana Blotter | Public Safety Records</title>
+    <link rel="alternate" type="application/atom+xml" title="Montana Blotter — Daily Reports" href="/feed.xml">
 </head>
 <body class="bg-slate-50 font-sans text-slate-900">
 
@@ -25,6 +26,9 @@
                 <a href="/posts" class="text-xs text-slate-500 hover:text-slate-900 font-bold uppercase tracking-widest">
                     Archive
                 </a>
+                <a href="/feed.xml" class="text-xs text-slate-400 hover:text-orange-500 font-bold uppercase tracking-widest" title="Atom/RSS Feed">
+                    <i class="fas fa-rss mr-1"></i>Feed
+                </a>
                 <a href="/admin/login" class="text-xs text-slate-400 hover:text-slate-900 font-bold uppercase tracking-widest">
                     Admin
                 </a>
@@ -33,33 +37,54 @@
     </nav>
 
     <!-- Hero -->
-    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-10 px-6">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-12 px-6">
+        <div class="max-w-3xl mx-auto text-center">
+            <span class="inline-block bg-blue-500/20 text-blue-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4">
+                Open Source &bull; Free Forever
+            </span>
+            <h2 class="text-3xl md:text-5xl font-black tracking-tight leading-tight mb-3">
+                Montana Daily Activity Reports.<br/>
+                <span class="text-blue-400 italic">Transparent &amp; Accessible.</span>
+            </h2>
+            <p class="text-slate-300 text-sm mb-6">
+                AI-summarized police blotters from Montana law enforcement agencies. No account required.
+            </p>
+
+            <!-- Hero search bar -->
+            <form action="/" method="GET" class="flex gap-2 max-w-xl mx-auto">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" name="q" value="{{ q }}"
+                           placeholder="Search incidents, locations, agencies..."
+                           autofocus
+                           class="w-full pl-11 pr-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 text-sm focus:outline-none focus:bg-white/20 focus:border-blue-400 transition">
+                </div>
+                <button type="submit"
+                        class="bg-blue-500 hover:bg-blue-400 text-white font-black px-6 py-3 rounded-xl text-sm uppercase tracking-wide transition">
+                    Search
+                </button>
+            </form>
+        </div>
+
+        <!-- Stats row -->
+        <div class="max-w-7xl mx-auto mt-8 flex justify-center gap-8 text-center">
             <div>
-                <span class="inline-block bg-blue-500/20 text-blue-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3">
-                    Open Source &bull; Free Forever
-                </span>
-                <h2 class="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                    Montana Daily Activity Reports.<br/>
-                    <span class="text-blue-400 italic">Transparent &amp; Accessible.</span>
-                </h2>
-                <p class="text-slate-300 text-sm mt-2 max-w-lg">
-                    AI-summarized police blotters from Montana law enforcement agencies. No account required.
-                </p>
+                <p class="text-2xl font-black">{{ total_records }}</p>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">Raw Records</p>
             </div>
-            <div class="flex gap-6 text-center flex-shrink-0">
-                <div class="bg-white/10 rounded-2xl px-6 py-4">
-                    <p class="text-2xl font-black">{{ total_records }}</p>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Raw Records</p>
-                </div>
-                <div class="bg-white/10 rounded-2xl px-6 py-4">
-                    <p class="text-2xl font-black">{{ counties|length }}</p>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Counties</p>
-                </div>
-                <div class="bg-white/10 rounded-2xl px-6 py-4">
-                    <p class="text-2xl font-black">{{ total }}</p>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Reports</p>
-                </div>
+            <div class="border-l border-white/10 pl-8">
+                <p class="text-2xl font-black">{{ counties|length }}</p>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">Counties</p>
+            </div>
+            <div class="border-l border-white/10 pl-8">
+                <p class="text-2xl font-black">{{ agencies|length }}</p>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">Agencies</p>
+            </div>
+            <div class="border-l border-white/10 pl-8">
+                <a href="/feed.xml" class="group">
+                    <p class="text-2xl font-black group-hover:text-orange-400 transition"><i class="fas fa-rss"></i></p>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5 group-hover:text-orange-400 transition">RSS Feed</p>
+                </a>
             </div>
         </div>
     </section>
@@ -101,9 +126,11 @@
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Filters</h3>
                 <form method="GET" action="/" class="space-y-3" id="filter-form">
-                    <!-- preserve date if set -->
                     {% if date_filter %}
                     <input type="hidden" name="date" value="{{ date_filter }}">
+                    {% endif %}
+                    {% if agency %}
+                    <input type="hidden" name="agency" value="{{ agency }}">
                     {% endif %}
 
                     <div>
@@ -148,25 +175,71 @@
                         Apply Filters
                     </button>
 
-                    {% if county or city or agency_type or q or date_filter %}
+                    {% if county or city or agency_type or agency or q or date_filter %}
                     <a href="/" class="block text-center text-xs text-slate-400 hover:text-slate-700">
                         Clear all filters
                     </a>
                     {% endif %}
                 </form>
             </div>
+
+            <!-- Agency Directory -->
+            {% if agencies %}
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Contributing Agencies</h3>
+                <div class="space-y-2">
+                    {% for ag in agencies %}
+                    <a href="/?agency={{ ag.agency_name | urlencode }}"
+                       class="flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-slate-50 transition group {% if agency == ag.agency_name %}bg-blue-50 border border-blue-100{% endif %}">
+                        <div class="flex items-center gap-2 min-w-0">
+                            {% if ag.agency_type == 'sheriff' %}
+                            <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[9px]">
+                                <i class="fas fa-star"></i>
+                            </span>
+                            {% elif ag.agency_type == 'police' %}
+                            <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-red-100 text-red-700 text-[9px]">
+                                <i class="fas fa-shield-alt"></i>
+                            </span>
+                            {% else %}
+                            <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-[9px]">
+                                <i class="fas fa-building"></i>
+                            </span>
+                            {% endif %}
+                            <span class="text-xs font-semibold text-slate-700 truncate group-hover:text-blue-700 transition">
+                                {{ ag.agency_name }}
+                            </span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 flex-shrink-0 font-medium">
+                            {{ ag.report_count }}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% if agency %}
+                <a href="/" class="block mt-3 text-center text-xs text-slate-400 hover:text-slate-700">
+                    <i class="fas fa-times mr-1"></i>Show all agencies
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
         </aside>
 
         <!-- ===== FEED ===== -->
         <div class="flex-1 min-w-0 space-y-6">
 
             <!-- Active filters banner -->
-            {% if date_filter or county or city or agency_type or q %}
+            {% if date_filter or county or city or agency_type or agency or q %}
             <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="text-slate-500 font-semibold">Filtered by:</span>
                 {% if date_filter %}
                 <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
                     <i class="fas fa-calendar-alt mr-1"></i>{{ date_filter }}
+                </span>
+                {% endif %}
+                {% if agency %}
+                <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">
+                    <i class="fas fa-building mr-1"></i>{{ agency }}
                 </span>
                 {% endif %}
                 {% if county %}
@@ -245,11 +318,11 @@
                     <p class="text-sm text-slate-500">Page {{ page }} of {{ total_pages }}</p>
                     <div class="flex gap-2">
                         {% if page > 1 %}
-                        <a href="?county={{ county }}&city={{ city }}&agency_type={{ agency_type }}&q={{ q }}&date={{ date_filter }}&page={{ page - 1 }}"
+                        <a href="?county={{ county }}&city={{ city }}&agency_type={{ agency_type }}&agency={{ agency }}&q={{ q }}&date={{ date_filter }}&page={{ page - 1 }}"
                            class="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50 font-medium">&larr; Prev</a>
                         {% endif %}
                         {% if page < total_pages %}
-                        <a href="?county={{ county }}&city={{ city }}&agency_type={{ agency_type }}&q={{ q }}&date={{ date_filter }}&page={{ page + 1 }}"
+                        <a href="?county={{ county }}&city={{ city }}&agency_type={{ agency_type }}&agency={{ agency }}&q={{ q }}&date={{ date_filter }}&page={{ page + 1 }}"
                            class="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50 font-medium">Next &rarr;</a>
                         {% endif %}
                     </div>
@@ -313,6 +386,7 @@
             if ('{{ county }}')                     params.set('county',      '{{ county }}');
             if ('{{ city }}')                       params.set('city',        '{{ city }}');
             if ('{{ agency_type }}')                params.set('agency_type', '{{ agency_type }}');
+            if ('{{ agency }}')                     params.set('agency',      '{{ agency }}');
             if ('{{ q }}')                          params.set('q',           '{{ q }}');
             return params.toString();
         }

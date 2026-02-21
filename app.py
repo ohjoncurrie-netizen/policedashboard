@@ -58,6 +58,7 @@ def index():
     county      = request.args.get('county', '')
     city        = request.args.get('city', '')
     agency_type = request.args.get('agency_type', '')
+    agency      = request.args.get('agency', '')   # specific agency_name
     search_query = request.args.get('q', '')
     date_filter = request.args.get('date', '')   # expects YYYY-MM-DD
     page        = max(1, request.args.get('page', 1, type=int))
@@ -91,6 +92,9 @@ def index():
     if agency_type:
         sql += " AND posts.agency_type = ?"
         params.append(agency_type)
+    if agency:
+        sql += " AND posts.agency_name = ?"
+        params.append(agency)
     if search_query:
         st = f'%{search_query}%'
         sql += " AND (posts.title LIKE ? OR posts.summary LIKE ?)"
@@ -114,6 +118,17 @@ def index():
     cities = [r['city'] for r in conn.execute(
         "SELECT DISTINCT city FROM posts WHERE city != '' ORDER BY city").fetchall()]
 
+    # Agency directory: each agency with last report date and count
+    agencies = conn.execute("""
+        SELECT agency_name, agency_type,
+               MAX(incident_date) AS last_report,
+               COUNT(*) AS report_count
+        FROM posts
+        WHERE agency_name IS NOT NULL AND agency_name != ''
+        GROUP BY agency_name
+        ORDER BY last_report DESC
+    """).fetchall()
+
     # Calendar: all dates that have at least one post, normalised to YYYY-MM-DD
     dates_with_posts = []
     for row in conn.execute(
@@ -136,13 +151,73 @@ def index():
                            page=page,
                            counties=counties,
                            cities=cities,
+                           agencies=agencies,
                            county=county,
                            city=city,
                            agency_type=agency_type,
+                           agency=agency,
                            q=search_query,
                            date_filter=date_filter,
                            dates_with_posts=dates_with_posts,
                            total_records=total_records)
+
+
+@app.route('/feed.xml')
+def rss_feed():
+    """Atom feed of the 20 most recent daily activity reports."""
+    conn = get_db()
+    posts = conn.execute("""
+        SELECT posts.*, blotters.county AS blotter_county
+        FROM posts
+        JOIN blotters ON posts.blotter_id = blotters.id
+        ORDER BY posts.incident_date DESC, posts.created_at DESC
+        LIMIT 20
+    """).fetchall()
+    conn.close()
+
+    # Build RFC-3339 timestamps
+    def to_rfc3339(date_str, created_at):
+        for fmt in ('%m/%d/%y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(date_str, fmt).strftime('%Y-%m-%dT00:00:00Z')
+            except (ValueError, TypeError):
+                pass
+        try:
+            return datetime.strptime(created_at[:19], '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%dT%H:%M:%SZ')
+        except (ValueError, TypeError):
+            pass
+        return datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    items = []
+    for p in posts:
+        pub = to_rfc3339(p['incident_date'], p['created_at'])
+        summary_snippet = (p['summary'] or '')[:300].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        title = (p['title'] or 'Daily Activity Report').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        agency = (p['agency_name'] or 'Montana Blotter').replace('&', '&amp;')
+        link = f"https://montanablotters.com/?date={pub[:10]}&amp;agency={agency}"
+        items.append(f"""  <entry>
+    <title>{title}</title>
+    <link href="{link}"/>
+    <id>{link}</id>
+    <updated>{pub}</updated>
+    <author><name>{agency}</name></author>
+    <summary type="text">{summary_snippet}</summary>
+  </entry>""")
+
+    updated = to_rfc3339(posts[0]['incident_date'], posts[0]['created_at']) if posts else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Montana Blotter — Daily Activity Reports</title>
+  <subtitle>AI-summarized police blotters from Montana law enforcement agencies</subtitle>
+  <link href="https://montanablotters.com/feed.xml" rel="self"/>
+  <link href="https://montanablotters.com/"/>
+  <id>https://montanablotters.com/feed.xml</id>
+  <updated>{updated}</updated>
+{chr(10).join(items)}
+</feed>"""
+
+    from flask import Response
+    return Response(xml, mimetype='application/atom+xml')
 
 @app.route('/record/<int:record_id>')
 def view_record(record_id):
