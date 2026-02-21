@@ -8,3 +8,5 @@ records/
 *.log
 config.py
 .claude/
+db_backups/
+backup.log
