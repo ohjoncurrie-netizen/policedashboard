@@ -17,13 +17,26 @@ class BlotterParser:
         self.incidents = []
 
     def _extract_text(self) -> str:
-        """Extract raw text from the PDF file."""
+        """Extract raw text from the PDF, falling back to OCR for image-based PDFs."""
         full_text = ""
         with pdfplumber.open(self.pdf_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
                     full_text += text + "\n"
+
+        if not full_text.strip():
+            # No embedded text — try OCR
+            try:
+                from pdf2image import convert_from_path
+                import pytesseract
+                pages = convert_from_path(self.pdf_path, dpi=200)
+                for page in pages:
+                    full_text += pytesseract.image_to_string(page, config='--psm 6') + "\n"
+            except Exception as e:
+                import logging
+                logging.warning(f"OCR failed for {self.pdf_path}: {e}")
+
         return full_text
 
     def _parse_text(self, full_text: str) -> Dict:
@@ -34,6 +47,8 @@ class BlotterParser:
             self.incidents = self._parse_gcso_format(full_text)
         elif re.search(r'Helena Police|HPD Officers responded|helenamt\.gov', full_text, re.IGNORECASE):
             self.incidents = self._parse_helena_format(full_text)
+        elif re.search(r'HAVRE POLICE|For Jurisdiction:\s*HAVRE', full_text, re.IGNORECASE):
+            self.incidents = self._parse_havre_format(full_text)
         else:
             self.incidents = self._parse_generic_format(full_text)
 
@@ -53,6 +68,10 @@ class BlotterParser:
         # Helena Police Department is in Lewis and Clark County
         if re.search(r'Helena Police|helenamt\.gov|Helena Police Department', text, re.IGNORECASE):
             return "Lewis and Clark"
+
+        # Havre Police Department is in Hill County
+        if re.search(r'HAVRE POLICE|For Jurisdiction:\s*HAVRE', text, re.IGNORECASE):
+            return "Hill"
 
         county_patterns = [
             r"(\w+)\s+County\s+Sheriff",
@@ -265,6 +284,140 @@ class BlotterParser:
         if 'vehicle' in d:
             return 'Vehicle'
         return 'Police Incident'
+
+    @staticmethod
+    def _clean_ocr_artifacts(text: str) -> str:
+        """Remove common OCR artifacts from table-border characters."""
+        # Remove isolated pipe/bang/colon/bracket chars that are table borders
+        cleaned = re.sub(r'(?<!\w)[|!{}](?!\w)', ' ', text)
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+        return cleaned
+
+    def _parse_havre_format(self, text: str) -> List[Dict]:
+        """Parse Havre Police Department dispatch log format.
+
+        Format per line:
+          26-2080 0737 COMPLAINT C- NTA ISSUED WITH REPORT
+          Location/Address: [HAV 433] SOME PLACE - 4TH ST
+          Narrative:
+          brief description
+        """
+        incidents = []
+
+        # Extract date from header
+        date_str = None
+        date_match = re.search(r'For Date:\s*(\d{2}/\d{2}/\d{4})', text)
+        if date_match:
+            try:
+                dt = datetime.strptime(date_match.group(1), '%m/%d/%Y')
+                date_str = dt.strftime('%m/%d/%y')
+            except ValueError:
+                pass
+        if not date_str:
+            date_str = datetime.now().strftime('%m/%d/%y')
+
+        # Split into per-incident blocks at each call number
+        blocks = re.split(r'\n(?=\d{2}-\d{4}\s)', text)
+
+        for block in blocks:
+            if not block.strip():
+                continue
+
+            lines = [l.strip() for l in block.splitlines() if l.strip()]
+            if not lines:
+                continue
+
+            # First line: "26-2080 O737 COMPLAINT C- NTA ISSUED WITH REPORT"
+            m = re.match(
+                r'^(\d{2}-\d{4})\s+([0O]?\d{3,4})\s*(.*)',
+                lines[0])
+            if not m:
+                continue
+
+            call_num = m.group(1)
+            time_raw = m.group(2).replace('O', '0').replace('o', '0')
+            rest = m.group(3).strip()
+
+            # Convert military time → 12-hour
+            try:
+                if len(time_raw) == 3:
+                    time_raw = '0' + time_raw
+                dt = datetime.strptime(time_raw, '%H%M')
+                time_val = dt.strftime('%-I:%M %p')
+            except ValueError:
+                time_val = time_raw
+
+            # Split rest into incident type and action code
+            # Action codes look like "C- ...", "J- ...", "L- ...", etc.
+            action = ''
+            incident_type = rest
+            action_m = re.search(r'\s+([A-Z]-\s+.+)$', rest)
+            if action_m:
+                action = action_m.group(1).strip()
+                incident_type = rest[:action_m.start()].strip()
+
+            # If no incident type found on first line, check second non-meta line
+            if not incident_type:
+                for line in lines[1:4]:
+                    if not re.match(
+                        r'^(Location|Narrative|Calling|Involved|Refer|Arrest|'
+                        r'Summons|Address|Age|Charges|Page)[\s:/]',
+                            line, re.IGNORECASE):
+                        incident_type = line
+                        break
+
+            # Extract location
+            location = 'Havre, MT'
+            for line in lines:
+                loc_m = re.match(r'Location(?:/Address)?:\s*(.+)', line, re.IGNORECASE)
+                if loc_m:
+                    loc = loc_m.group(1).strip()
+                    loc = re.sub(r'[\[{]HAV[^\]}\s]*[\]}]?\s*', '', loc)  # remove [HAV xxx] codes
+                    loc = self._clean_ocr_artifacts(loc).strip(' -|~')
+                    if loc:
+                        location = loc
+                    break
+
+            # Extract narrative (lines after "Narrative:" up to next meta field)
+            narr_lines = []
+            in_narr = False
+            for line in lines:
+                if re.match(r'^Narrative:', line, re.IGNORECASE):
+                    in_narr = True
+                    after = re.sub(r'^Narrative:\s*', '', line, flags=re.IGNORECASE).strip()
+                    if after:
+                        narr_lines.append(after)
+                    continue
+                if in_narr:
+                    if re.match(
+                        r'^(Refer To|Arrest:|Summons|Charges:|Age:|Address:|'
+                        r'Calling Party:|Involved Party:|For Date:)',
+                            line, re.IGNORECASE):
+                        break
+                    narr_lines.append(line)
+            narrative = ' '.join(narr_lines).strip()
+
+            details = narrative if narrative else incident_type
+            if action:
+                details = f"{details} ({action})" if details else action
+            # Strip page headers that bleed into narrative via OCR
+            details = re.sub(
+                r'HAVRE POLICE DEPT\w*\s+Page:.*?Printed:\s*\d{2}/\d{2}/\d{4}',
+                '', details, flags=re.IGNORECASE | re.DOTALL)
+            details = self._clean_ocr_artifacts(details)
+
+            incidents.append({
+                'cfs_number': call_num,
+                'date': date_str,
+                'time': time_val,
+                'location': location,
+                'incident_type': incident_type.title() if incident_type else 'Police Incident',
+                'details': details,
+                'officer': None,
+                'command_logs': [],
+            })
+
+        return incidents
 
     def _parse_generic_format(self, text: str) -> List[Dict]:
         """Fallback parser for non-GCSO formats"""
