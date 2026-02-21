@@ -142,6 +142,29 @@ def index():
             pass
 
     total_records = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
+
+    # Leaderboard: most active agencies this week vs last week
+    this_week_rows = conn.execute("""
+        SELECT COALESCE(county, 'Unknown') AS county,
+               COUNT(*) AS cnt
+        FROM records
+        WHERE created_at >= datetime('now', '-7 days')
+        GROUP BY county ORDER BY cnt DESC LIMIT 6
+    """).fetchall()
+    prev_week_map = {r['county']: r['cnt'] for r in conn.execute("""
+        SELECT COALESCE(county, 'Unknown') AS county, COUNT(*) AS cnt
+        FROM records
+        WHERE created_at >= datetime('now', '-14 days')
+          AND created_at < datetime('now', '-7 days')
+        GROUP BY county
+    """).fetchall()}
+    leaderboard = []
+    for r in this_week_rows:
+        prev = prev_week_map.get(r['county'], 0)
+        trend = 'up' if r['cnt'] > prev else ('down' if r['cnt'] < prev else 'same')
+        leaderboard.append({'county': r['county'], 'count': r['cnt'],
+                            'prev': prev, 'trend': trend})
+
     conn.close()
 
     return render_template('index.html',
@@ -159,7 +182,8 @@ def index():
                            q=search_query,
                            date_filter=date_filter,
                            dates_with_posts=dates_with_posts,
-                           total_records=total_records)
+                           total_records=total_records,
+                           leaderboard=leaderboard)
 
 
 @app.route('/feed.xml')
@@ -218,6 +242,119 @@ def rss_feed():
 
     from flask import Response
     return Response(xml, mimetype='application/atom+xml')
+
+
+@app.route('/arrests')
+def arrests():
+    """Dedicated arrest log — records where an arrest was made."""
+    county = request.args.get('county', '')
+    search_query = request.args.get('q', '')
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = 25
+
+    conn = get_db()
+
+    arrest_filter = """(
+        LOWER(COALESCE(records.details, '')) LIKE '%arrest%'
+        OR LOWER(COALESCE(records.incident_type, '')) LIKE '%arrest%'
+        OR LOWER(COALESCE(records.incident, '')) LIKE '%arrest%'
+    )"""
+
+    sql = f"""
+        SELECT records.*,
+               COALESCE(blotters.filename, '') AS filename
+        FROM records
+        LEFT JOIN blotters ON records.blotter_id = blotters.id
+        WHERE {arrest_filter}
+    """
+    params = []
+
+    if county:
+        sql += " AND records.county = ?"
+        params.append(county)
+    if search_query:
+        st = f'%{search_query}%'
+        sql += " AND (records.incident_type LIKE ? OR records.details LIKE ? OR records.location LIKE ?)"
+        params.extend([st, st, st])
+
+    total = conn.execute(
+        sql.replace("SELECT records.*,\n               COALESCE(blotters.filename, '') AS filename", "SELECT COUNT(*)"),
+        params).fetchone()[0]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    sql += " ORDER BY records.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, (page - 1) * per_page])
+    records = conn.execute(sql, params).fetchall()
+
+    counties = [r['county'] for r in conn.execute(
+        'SELECT DISTINCT county FROM records ORDER BY county').fetchall()]
+
+    conn.close()
+    return render_template('arrests.html',
+                           records=records, total=total,
+                           total_pages=total_pages, page=page,
+                           counties=counties, county=county,
+                           q=search_query)
+
+
+@app.route('/subscribe', methods=['GET', 'POST'])
+def subscribe():
+    """Public email digest subscription."""
+    import secrets
+
+    conn = get_db()
+    all_counties = [r['county'] for r in conn.execute(
+        'SELECT DISTINCT county FROM posts ORDER BY county').fetchall()]
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        selected = request.form.getlist('counties')  # empty list = all counties
+
+        if not email or '@' not in email:
+            conn.close()
+            return render_template('subscribe.html', counties=all_counties,
+                                   error='Please enter a valid email address.')
+
+        token = secrets.token_urlsafe(32)
+        counties_str = ','.join(selected)
+
+        try:
+            conn.execute(
+                'INSERT INTO subscribers (email, counties, token) VALUES (?, ?, ?)',
+                (email, counties_str, token))
+            conn.commit()
+            conn.close()
+            return render_template('subscribe.html', counties=all_counties,
+                                   success=True, email=email)
+        except Exception:
+            # Email already subscribed — update preferences
+            conn.execute(
+                'UPDATE subscribers SET counties=?, active=1 WHERE email=?',
+                (counties_str, email))
+            conn.commit()
+            conn.close()
+            return render_template('subscribe.html', counties=all_counties,
+                                   success=True, email=email, updated=True)
+
+    conn.close()
+    return render_template('subscribe.html', counties=all_counties)
+
+
+@app.route('/unsubscribe')
+def unsubscribe():
+    """Unsubscribe via token link in digest emails."""
+    token = request.args.get('token', '')
+    conn = get_db()
+    row = conn.execute('SELECT email FROM subscribers WHERE token=?', (token,)).fetchone()
+    if row:
+        conn.execute('UPDATE subscribers SET active=0 WHERE token=?', (token,))
+        conn.commit()
+        email = row['email']
+        conn.close()
+        return render_template('subscribe.html', counties=[], unsubscribed=True, email=email)
+    conn.close()
+    return render_template('subscribe.html', counties=[], error='Invalid or expired unsubscribe link.')
+
 
 @app.route('/record/<int:record_id>')
 def view_record(record_id):

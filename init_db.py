@@ -177,6 +177,18 @@ def migrate():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_agency_type ON posts(agency_type)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_incident_date ON posts(incident_date)')
 
+    # Subscribers table for public email digest
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS subscribers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            counties TEXT DEFAULT '',
+            token TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("✅ Migration complete")
