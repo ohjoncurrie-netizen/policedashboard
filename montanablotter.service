@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/root/montanablotter
-ExecStart=/root/montanablotter/venv/bin/gunicorn -w 3 --bind unix:/tmp/montanablotter.sock -m 007 app:app
+ExecStart=/root/montanablotter/venv/bin/gunicorn -w 3 --bind unix:/tmp/montanablotter.sock -m 000 app:app
 Restart=always
 RestartSec=5
 StandardOutput=append:/root/montanablotter/gunicorn.log
