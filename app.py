@@ -54,52 +54,95 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-    """Public homepage with search and browse"""
-    
-    # Get search parameters
-    county = request.args.get('county', '')
+    """Public homepage — daily activity reports with calendar filter"""
+    county      = request.args.get('county', '')
+    city        = request.args.get('city', '')
+    agency_type = request.args.get('agency_type', '')
     search_query = request.args.get('q', '')
-    
+    date_filter = request.args.get('date', '')   # expects YYYY-MM-DD
+    page        = max(1, request.args.get('page', 1, type=int))
+    per_page    = 10
+
     conn = get_db()
-    
-    # Get county list for filter
-    counties = conn.execute('SELECT DISTINCT county FROM records ORDER BY county').fetchall()
-    counties = [c['county'] for c in counties]
-    
-    # Build query for records
+
+    # Convert YYYY-MM-DD date_filter → MM/DD/YY for DB match
+    date_sql_val = ''
+    if date_filter:
+        try:
+            dt = datetime.strptime(date_filter, '%Y-%m-%d')
+            date_sql_val = dt.strftime('%m/%d/%y')
+        except ValueError:
+            date_filter = ''
+
     sql = """
-        SELECT 
-            records.*,
-            COALESCE(blotters.filename, 'Uncategorized') as filename
-        FROM records 
-        LEFT JOIN blotters ON records.blotter_id = blotters.id 
+        SELECT posts.*, blotters.county AS blotter_county
+        FROM posts
+        JOIN blotters ON posts.blotter_id = blotters.id
         WHERE 1=1
     """
     params = []
-    
+
     if county:
-        sql += " AND records.county = ?"
+        sql += " AND posts.county = ?"
         params.append(county)
-    
+    if city:
+        sql += " AND posts.city LIKE ?"
+        params.append(f'%{city}%')
+    if agency_type:
+        sql += " AND posts.agency_type = ?"
+        params.append(agency_type)
     if search_query:
-        sql += " AND (records.incident_type LIKE ? OR records.details LIKE ? OR records.location LIKE ?)"
-        search_term = f'%{search_query}%'
-        params.extend([search_term, search_term, search_term])
-    
-    # Limit to 50 most recent for homepage
-    sql += " ORDER BY records.date DESC, records.created_at DESC LIMIT 50"
-    
-    records = conn.execute(sql, params).fetchall()
-    total = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
-    
+        st = f'%{search_query}%'
+        sql += " AND (posts.title LIKE ? OR posts.summary LIKE ?)"
+        params.extend([st, st])
+    if date_sql_val:
+        sql += " AND posts.incident_date = ?"
+        params.append(date_sql_val)
+
+    count_sql = sql.replace(
+        "SELECT posts.*, blotters.county AS blotter_county", "SELECT COUNT(*)")
+    total = conn.execute(count_sql, params).fetchone()[0]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
+    sql += " ORDER BY posts.incident_date DESC, posts.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, (page - 1) * per_page])
+    posts = conn.execute(sql, params).fetchall()
+
+    # Filter dropdowns
+    counties = [r['county'] for r in conn.execute(
+        'SELECT DISTINCT county FROM posts ORDER BY county').fetchall()]
+    cities = [r['city'] for r in conn.execute(
+        "SELECT DISTINCT city FROM posts WHERE city != '' ORDER BY city").fetchall()]
+
+    # Calendar: all dates that have at least one post, normalised to YYYY-MM-DD
+    dates_with_posts = []
+    for row in conn.execute(
+            'SELECT DISTINCT incident_date FROM posts '
+            'WHERE incident_date IS NOT NULL AND incident_date != "" '
+            'ORDER BY incident_date').fetchall():
+        try:
+            d = datetime.strptime(row[0], '%m/%d/%y').strftime('%Y-%m-%d')
+            dates_with_posts.append(d)
+        except ValueError:
+            pass
+
+    total_records = conn.execute('SELECT COUNT(*) FROM records').fetchone()[0]
     conn.close()
-    
-    return render_template('index.html', 
-                         records=records,
-                         total=total,
-                         counties=counties,
-                         county=county,
-                         q=search_query)
+
+    return render_template('index.html',
+                           posts=posts,
+                           total=total,
+                           total_pages=total_pages,
+                           page=page,
+                           counties=counties,
+                           cities=cities,
+                           county=county,
+                           city=city,
+                           agency_type=agency_type,
+                           q=search_query,
+                           date_filter=date_filter,
+                           dates_with_posts=dates_with_posts,
+                           total_records=total_records)
 
 @app.route('/record/<int:record_id>')
 def view_record(record_id):
