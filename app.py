@@ -29,6 +29,16 @@ app.config['UPLOAD_FOLDER'] = config.UPLOAD_DIR
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@app.template_filter('to_iso_date')
+def to_iso_date(date_str):
+    """Convert MM/DD/YY or MM/DD/YYYY to YYYY-MM-DD for share URLs."""
+    for fmt in ('%m/%d/%y', '%Y-%m-%d', '%m/%d/%Y'):
+        try:
+            return datetime.strptime(date_str or '', fmt).strftime('%Y-%m-%d')
+        except (ValueError, TypeError):
+            pass
+    return date_str or ''
+
 def get_db():
     conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
