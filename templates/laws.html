@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Montana Laws | Montana Blotter</title>
+    <meta name="description" content="Overview of Montana criminal, traffic, hunting, and general statutes. Reference guide for Montana Code Annotated (MCA).">
+</head>
+<body class="bg-slate-50 font-sans">
+
+    <!-- Nav -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="font-black text-slate-900 uppercase italic tracking-tight text-lg">
+                Montana Blotter
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-xs text-slate-500 hover:text-slate-900 font-bold uppercase tracking-widest">
+                    <i class="fas fa-home mr-1"></i>Feed
+                </a>
+                <a href="/arrests" class="text-xs text-slate-500 hover:text-red-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-handcuffs mr-1"></i>Arrests
+                </a>
+                <a href="/blog" class="text-xs text-slate-500 hover:text-emerald-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-pen-nib mr-1"></i>Blog
+                </a>
+                <a href="/laws" class="text-xs text-indigo-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-scale-balanced mr-1"></i>Laws
+                </a>
+                <a href="/subscribe" class="text-xs text-blue-600 hover:text-blue-700 font-bold uppercase tracking-widest">
+                    <i class="fas fa-envelope mr-1"></i>Subscribe
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="bg-slate-900 text-white py-14 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="inline-flex items-center bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-4">
+                <i class="fas fa-scale-balanced mr-2"></i>Reference Guide
+            </div>
+            <h1 class="text-4xl font-black mb-3">Montana Laws</h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                A plain-language overview of key Montana statutes. For full legal text, always consult the
+                <a href="https://leg.mt.gov/bills/mca/" target="_blank" class="text-indigo-400 hover:text-indigo-300 underline">official Montana Code Annotated (MCA)</a>.
+            </p>
+        </div>
+    </div>
+
+    <!-- Jump links -->
+    <div class="bg-white border-b border-slate-200 sticky top-14 z-40">
+        <div class="max-w-4xl mx-auto px-4 flex gap-6 overflow-x-auto py-3 text-sm font-bold">
+            <a href="#criminal" class="text-slate-600 hover:text-indigo-600 whitespace-nowrap transition"><i class="fas fa-gavel mr-1"></i>Criminal</a>
+            <a href="#traffic"  class="text-slate-600 hover:text-indigo-600 whitespace-nowrap transition"><i class="fas fa-car mr-1"></i>Traffic</a>
+            <a href="#hunting"  class="text-slate-600 hover:text-indigo-600 whitespace-nowrap transition"><i class="fas fa-crosshairs mr-1"></i>Hunting &amp; Fishing</a>
+            <a href="#general"  class="text-slate-600 hover:text-indigo-600 whitespace-nowrap transition"><i class="fas fa-book mr-1"></i>General Statutes</a>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto px-4 py-10 space-y-14">
+
+        <!-- CRIMINAL LAWS -->
+        <section id="criminal">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-red-100 text-red-700 p-3 rounded-xl"><i class="fas fa-gavel text-xl"></i></div>
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">Criminal Laws</h2>
+                    <p class="text-slate-500 text-sm">Title 45 — Montana Code Annotated</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+
+                {% set criminal_laws = [
+                    ("Assault (MCA 45-5-201)", "Purposely or knowingly causing bodily injury to another person. Simple assault is a misdemeanor. Aggravated assault (with a weapon or serious bodily injury) is a felony punishable by up to 20 years."),
+                    ("Homicide (MCA 45-5-101 to 103)", "Deliberate homicide (first degree murder) carries a sentence of death or life imprisonment. Mitigated deliberate homicide and negligent homicide carry lesser penalties depending on intent and circumstances."),
+                    ("Theft (MCA 45-6-301)", "Theft of property under $1,500 is a misdemeanor. Over $1,500 is a felony. Grand theft of property over $5,000 carries up to 10 years imprisonment. Motor vehicle theft is always a felony."),
+                    ("Burglary (MCA 45-6-204)", "Entering or remaining in an occupied structure with intent to commit a crime is burglary (felony, up to 20 years). Aggravated burglary involving a weapon carries up to 40 years."),
+                    ("Drug Offenses (MCA 45-9)", "Possession of dangerous drugs varies by schedule. Possession of up to 60g of marijuana is a misdemeanor; over that amount or intent to distribute is a felony. Trafficking controlled substances carries up to life imprisonment depending on the substance."),
+                    ("DUI (MCA 61-8-401)", "Operating a vehicle with a BAC of 0.08% or higher (0.04% for CDL holders). First offense is a misdemeanor with a minimum 24-hour jail term. Repeat offenses escalate to felonies. Aggravated DUI (BAC ≥ 0.16%) carries enhanced penalties."),
+                    ("Sexual Assault (MCA 45-5-502)", "Sexual assault without consent is a felony punishable by up to life imprisonment. Rape and sexual intercourse without consent carry mandatory minimum sentences based on victim age and circumstances."),
+                    ("Domestic Violence (MCA 45-5-206)", "Partner or family member assault is a misdemeanor on first offense, felony on third. Violation of a restraining order in a domestic violence context is a separate criminal offense."),
+                ] %}
+
+                {% for title, desc in criminal_laws %}
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <h3 class="font-black text-slate-900 mb-1">{{ title }}</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">{{ desc }}</p>
+                </div>
+                {% endfor %}
+
+                <a href="https://leg.mt.gov/bills/mca/title_0450/chapters_index.html" target="_blank"
+                   class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-bold mt-2">
+                    <i class="fas fa-external-link-alt"></i>View full Title 45 on leg.mt.gov
+                </a>
+            </div>
+        </section>
+
+        <!-- TRAFFIC LAWS -->
+        <section id="traffic">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-yellow-100 text-yellow-700 p-3 rounded-xl"><i class="fas fa-car text-xl"></i></div>
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">Traffic Laws</h2>
+                    <p class="text-slate-500 text-sm">Title 61 — Montana Code Annotated</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+
+                {% set traffic_laws = [
+                    ("Speed Limits (MCA 61-8-303)", "Montana's default speed limits: 80 mph on interstate highways, 70 mph on two-lane paved roads, 25 mph in urban districts, and 15 mph in school zones. Excessive speeding (25+ mph over limit) can result in felony charges if it causes death or serious injury."),
+                    ("Seat Belt Law (MCA 61-9-409)", "All front-seat occupants must wear a seat belt. Children under 6 or under 60 lbs must be in an approved child safety seat. Violations are a primary offense — officers can pull you over solely for seat belt non-compliance."),
+                    ("Distracted Driving (MCA 61-8-1011)", "Texting while driving is illegal statewide. Handheld cell phone use while driving is prohibited. First offense is a $100 fine; fines increase for subsequent offenses."),
+                    ("DUI / Impaired Driving (MCA 61-8-401)", "BAC limit is 0.08% for standard drivers, 0.04% for commercial drivers, and 0.02% for drivers under 21. Implied consent law means refusal to take a breath/blood test results in automatic license suspension."),
+                    ("Reckless Driving (MCA 61-8-301)", "Operating a vehicle with willful disregard for safety of persons or property is a misdemeanor. Negligent vehicular assault (causing injury) is a felony punishable by up to 10 years."),
+                    ("Insurance Requirements (MCA 61-6-301)", "All registered vehicles must carry minimum liability insurance: $25,000 per person / $50,000 per accident for bodily injury, and $20,000 for property damage. Driving uninsured is a misdemeanor."),
+                    ("Open Container (MCA 61-8-460)", "Possession of an open alcoholic beverage container in a motor vehicle on a public highway is illegal for both driver and passengers. Violation is a misdemeanor."),
+                    ("Fleeing or Eluding (MCA 61-8-316)", "Willfully failing to stop when signaled by law enforcement is a misdemeanor. If the pursuit results in injury or death, charges escalate to a felony."),
+                ] %}
+
+                {% for title, desc in traffic_laws %}
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <h3 class="font-black text-slate-900 mb-1">{{ title }}</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">{{ desc }}</p>
+                </div>
+                {% endfor %}
+
+                <a href="https://leg.mt.gov/bills/mca/title_0610/chapters_index.html" target="_blank"
+                   class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-bold mt-2">
+                    <i class="fas fa-external-link-alt"></i>View full Title 61 on leg.mt.gov
+                </a>
+            </div>
+        </section>
+
+        <!-- HUNTING & FISHING -->
+        <section id="hunting">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-green-100 text-green-700 p-3 rounded-xl"><i class="fas fa-crosshairs text-xl"></i></div>
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">Hunting &amp; Fishing Laws</h2>
+                    <p class="text-slate-500 text-sm">Title 87 — Montana Code Annotated</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+
+                {% set hunting_laws = [
+                    ("License Requirements (MCA 87-2-102)", "Any person hunting, trapping, or fishing in Montana must have a valid license issued by Montana Fish, Wildlife & Parks (FWP). Residents and non-residents have different license fees and tag requirements."),
+                    ("Hunter Orange (MCA 87-6-414)", "During firearms deer and elk seasons, hunters must wear at least 400 square inches of fluorescent orange on the head and upper body. Violation is a misdemeanor."),
+                    ("Trespassing to Hunt (MCA 87-6-206)", "Hunting or fishing on private land without landowner permission is illegal and results in license suspension in addition to trespass penalties. Written permission is recommended."),
+                    ("Poaching (MCA 87-6-901)", "Taking wildlife out of season, over bag limits, or without a license constitutes poaching. Penalties include fines up to $10,000, license revocation, and possible felony charges for trophy species like elk, moose, or bighorn sheep."),
+                    ("Baiting & Feeding Wildlife (MCA 87-6-209)", "Baiting deer, elk, or other big game is prohibited. Knowingly feeding wildlife in a manner that creates a public safety hazard is a misdemeanor."),
+                    ("Fishing Regulations (MCA 87-3-101)", "Fishing without a license, exceeding bag limits, or using prohibited methods (dynamite, chemicals, electricity) are all illegal. Specific stream and lake regulations vary — check FWP regulations annually."),
+                    ("Sunday Hunting", "Montana has no general prohibition on Sunday hunting. However, specific seasons and regulations apply per species. Always verify current FWP regulations before hunting."),
+                    ("Firearm Use While Hunting (MCA 87-6-401)", "Discharging a firearm from a public road or within 50 feet of the center of a public road is prohibited. Shooting across a highway or railway is illegal."),
+                ] %}
+
+                {% for title, desc in hunting_laws %}
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <h3 class="font-black text-slate-900 mb-1">{{ title }}</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">{{ desc }}</p>
+                </div>
+                {% endfor %}
+
+                <a href="https://leg.mt.gov/bills/mca/title_0870/chapters_index.html" target="_blank"
+                   class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-bold mt-2">
+                    <i class="fas fa-external-link-alt"></i>View full Title 87 on leg.mt.gov
+                </a>
+            </div>
+        </section>
+
+        <!-- GENERAL STATUTES -->
+        <section id="general">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-indigo-100 text-indigo-700 p-3 rounded-xl"><i class="fas fa-book text-xl"></i></div>
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">General Montana Statutes</h2>
+                    <p class="text-slate-500 text-sm">Montana Code Annotated (MCA) — Selected Titles</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+
+                {% set general_laws = [
+                    ("Right to Keep and Bear Arms (Montana Constitution, Art. II §12)", "Montana's constitution explicitly protects the right of any person to bear arms in defense of home, person, and property. Montana imposes fewer restrictions than federal minimums on firearms ownership for law-abiding residents."),
+                    ("Concealed Carry (MCA 45-8-316)", "Montana is a permitless carry (constitutional carry) state. No permit is required to carry a concealed firearm for eligible adults. A permit is available voluntarily for reciprocity purposes in other states."),
+                    ("Self-Defense / Stand Your Ground (MCA 45-3-102)", "A person is justified in using force to defend themselves or others when they reasonably believe force is necessary. Montana does not require a duty to retreat when facing unlawful force."),
+                    ("Trespassing (MCA 45-6-203)", "Criminal trespass is knowingly entering or remaining on another's land after being notified not to. Posted signs, fencing, or verbal/written notice all constitute adequate warning. Violation is a misdemeanor."),
+                    ("Public Intoxication (MCA 45-5-624)", "Being intoxicated in a public place is not a criminal offense in Montana. However, law enforcement may take an intoxicated person into protective custody for their safety."),
+                    ("Montana Privacy Law (MCA 45-8-213)", "Intercepting private communications without consent, voyeurism, and unlawful use of surveillance equipment are criminal offenses punishable as felonies depending on severity."),
+                    ("Marijuana Laws (MCA 16-12)", "Recreational marijuana use is legal for adults 21+ following the passage of I-190 in 2020. Adults may possess up to 1 ounce in public and grow up to 2 plants at home. Sales require a licensed dispensary. Use in public or in a vehicle remains prohibited."),
+                    ("Property Rights & Open Range (MCA 81-4-101)", "Montana is an open-range state in many rural areas. Livestock have the right to roam on unenclosed land. Motorists who hit livestock on open-range roads may be liable for the animal's value."),
+                ] %}
+
+                {% for title, desc in general_laws %}
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <h3 class="font-black text-slate-900 mb-1">{{ title }}</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">{{ desc }}</p>
+                </div>
+                {% endfor %}
+
+                <a href="https://leg.mt.gov/bills/mca/" target="_blank"
+                   class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-bold mt-2">
+                    <i class="fas fa-external-link-alt"></i>Browse the full Montana Code Annotated
+                </a>
+            </div>
+        </section>
+
+        <!-- Disclaimer -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-900">
+            <p class="font-bold mb-1"><i class="fas fa-triangle-exclamation mr-2"></i>Legal Disclaimer</p>
+            <p>This page is for general informational purposes only and does not constitute legal advice. Laws change — always verify current statutes at
+            <a href="https://leg.mt.gov/bills/mca/" target="_blank" class="underline font-bold">leg.mt.gov</a>
+            or consult a licensed Montana attorney for advice specific to your situation.</p>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 text-center text-xs py-6 mt-10">
+        <p>&copy; {{ 2026 }} Montana Blotter &mdash; Public safety transparency for Montana communities.</p>
+        <div class="flex justify-center gap-6 mt-3">
+            <a href="/" class="hover:text-white transition">Feed</a>
+            <a href="/arrests" class="hover:text-white transition">Arrests</a>
+            <a href="/blog" class="hover:text-white transition">Blog</a>
+            <a href="/laws" class="hover:text-white transition">Laws</a>
+            <a href="/subscribe" class="hover:text-white transition">Subscribe</a>
+        </div>
+    </footer>
+
+</body>
+</html>

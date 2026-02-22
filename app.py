@@ -384,6 +384,11 @@ def render_markdown(text):
     return _md.markdown(text or '', extensions=['extra', 'nl2br'])
 
 
+@app.route('/laws')
+def montana_laws():
+    return render_template('laws.html')
+
+
 @app.route('/blog')
 def blog():
     conn = get_db()
