@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog | Montana Blotter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="alternate" type="application/atom+xml" title="Montana Blotter" href="/feed.xml">
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center gap-3">
+                <div class="bg-slate-900 text-white p-2.5 rounded-xl">
+                    <i class="fas fa-mountain"></i>
+                </div>
+                <div>
+                    <h1 class="font-black uppercase italic tracking-tighter text-xl">Montana Blotter</h1>
+                    <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Free Public Records</p>
+                </div>
+            </a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-xs text-slate-500 hover:text-slate-900 font-bold uppercase tracking-widest">
+                    <i class="fas fa-home mr-1"></i>Home
+                </a>
+                <a href="/arrests" class="text-xs text-slate-500 hover:text-red-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-handcuffs mr-1"></i>Arrests
+                </a>
+                <a href="/blog" class="text-xs text-emerald-600 font-bold uppercase tracking-widest">
+                    <i class="fas fa-pen-nib mr-1"></i>Blog
+                </a>
+                <a href="/subscribe" class="text-xs text-blue-600 hover:text-blue-700 font-bold uppercase tracking-widest">
+                    <i class="fas fa-envelope mr-1"></i>Subscribe
+                </a>
+                <a href="/admin/login" class="text-xs text-slate-400 hover:text-slate-900 font-bold uppercase tracking-widest">Admin</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-12 px-6">
+        <div class="max-w-3xl mx-auto text-center">
+            <span class="inline-block bg-emerald-500 text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-4">Montana Blotter Blog</span>
+            <h2 class="text-3xl font-black uppercase italic tracking-tight mb-2">News &amp; Analysis</h2>
+            <p class="text-slate-400 text-sm">Insights on Montana public safety, records access, and community reporting.</p>
+        </div>
+    </section>
+
+    <!-- Content -->
+    <div class="max-w-3xl mx-auto px-6 py-10">
+
+        {% if posts %}
+            <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-6">{{ total }} post{{ 's' if total != 1 else '' }}</p>
+
+            <div class="space-y-8">
+            {% for post in posts %}
+                <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
+                    <div class="p-6">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xs text-slate-400 font-medium">
+                                <i class="fas fa-calendar-alt mr-1"></i>
+                                {{ post.created_at[:10] if post.created_at else '' }}
+                            </span>
+                            {% if post.author %}
+                            <span class="text-slate-300">·</span>
+                            <span class="text-xs text-slate-400 font-medium">{{ post.author }}</span>
+                            {% endif %}
+                        </div>
+                        <h2 class="text-xl font-bold text-slate-900 mb-2 leading-snug">
+                            <a href="/blog/{{ post.slug }}" class="hover:text-emerald-600 transition">{{ post.title }}</a>
+                        </h2>
+                        {% if post.excerpt %}
+                        <p class="text-slate-600 text-sm leading-relaxed mb-4">{{ post.excerpt }}</p>
+                        {% endif %}
+                        <a href="/blog/{{ post.slug }}"
+                           class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider transition">
+                            Read more <i class="fas fa-arrow-right text-[10px]"></i>
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <nav class="flex items-center justify-between mt-10">
+                <p class="text-sm text-slate-500">Page {{ page }} of {{ total_pages }}</p>
+                <div class="flex gap-2">
+                    {% if page > 1 %}
+                    <a href="?page={{ page - 1 }}" class="px-4 py-2 border border-slate-300 rounded text-sm hover:bg-slate-100">&larr; Prev</a>
+                    {% endif %}
+                    {% if page < total_pages %}
+                    <a href="?page={{ page + 1 }}" class="px-4 py-2 border border-slate-300 rounded text-sm hover:bg-slate-100">Next &rarr;</a>
+                    {% endif %}
+                </div>
+            </nav>
+            {% endif %}
+
+        {% else %}
+            <div class="bg-white rounded-xl border border-slate-200 p-16 text-center text-slate-400">
+                <i class="fas fa-pen-nib text-4xl mb-4 block"></i>
+                <p class="text-lg font-semibold">No posts yet</p>
+                <p class="text-sm mt-1">Check back soon for updates and analysis.</p>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 text-xs text-center py-8 mt-16">
+        <p>&copy; 2025 Montana Blotter &mdash; Public Safety Records for Montana</p>
+        <div class="flex justify-center gap-6 mt-3">
+            <a href="/" class="hover:text-white">Home</a>
+            <a href="/blog" class="hover:text-white">Blog</a>
+            <a href="/arrests" class="hover:text-white">Arrests</a>
+            <a href="/subscribe" class="hover:text-white">Subscribe</a>
+            <a href="/feed.xml" class="hover:text-orange-400"><i class="fas fa-rss mr-1"></i>Feed</a>
+        </div>
+    </footer>
+
+</body>
+</html>
