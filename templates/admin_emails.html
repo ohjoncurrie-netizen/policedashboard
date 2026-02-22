@@ -64,20 +64,24 @@
                 </div>
             </div>
 
-            <!-- County Selection Section -->
+            <!-- Agency Selection Section -->
             <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                 <h2 class="font-black text-lg mb-4 flex items-center gap-2">
                     <i class="fas fa-map-marked-alt text-purple-600"></i>
-                    Select Counties
+                    Select Agencies
                 </h2>
-                
-                <div class="mb-4">
+
+                <div class="mb-4 flex gap-2">
                     <button type="button" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-lg font-bold transition text-sm" onclick="toggleAllCounties()">
-                        Select All Counties
+                        Select All Sheriffs
+                    </button>
+                    <button type="button" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-lg font-bold transition text-sm" onclick="toggleAllPolice()">
+                        Select All PDs
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2">Sheriff Offices</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                     {% for county in counties %}
                     <label class="flex items-center p-3 border border-slate-200 rounded-lg hover:bg-purple-50 cursor-pointer transition">
                         <input type="checkbox" name="counties" value="{{ county }}" class="county-checkbox w-4 h-4 text-purple-600 rounded">
@@ -86,8 +90,18 @@
                     {% endfor %}
                 </div>
 
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2">Police Departments</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for dept in police_depts %}
+                    <label class="flex items-center p-3 border border-slate-200 rounded-lg hover:bg-blue-50 cursor-pointer transition">
+                        <input type="checkbox" name="counties" value="{{ dept }}" class="police-checkbox w-4 h-4 text-blue-600 rounded">
+                        <span class="ml-3 font-semibold text-slate-900">{{ dept }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
                 <p class="text-sm text-slate-500 mt-4">
-                    <i class="fas fa-info-circle"></i> Selected: <span id="county-count">0</span> counties
+                    <i class="fas fa-info-circle"></i> Selected: <span id="county-count">0</span> agencies
                 </p>
             </div>
 
@@ -165,15 +179,23 @@
     </div>
 
     <script>
-        // Update county count
+        // Update agency count
         function updateCountyCount() {
-            const checked = document.querySelectorAll('.county-checkbox:checked').length;
+            const checked = document.querySelectorAll('.county-checkbox:checked, .police-checkbox:checked').length;
             document.getElementById('county-count').textContent = checked;
         }
 
-        // Toggle all counties
+        // Toggle all sheriff offices
         function toggleAllCounties() {
             const checkboxes = document.querySelectorAll('.county-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateCountyCount();
+        }
+
+        // Toggle all police departments
+        function toggleAllPolice() {
+            const checkboxes = document.querySelectorAll('.police-checkbox');
             const allChecked = Array.from(checkboxes).every(cb => cb.checked);
             checkboxes.forEach(cb => cb.checked = !allChecked);
             updateCountyCount();
@@ -202,7 +224,7 @@
         // Event listeners
         document.querySelector('[name="subject"]').addEventListener('input', updatePreview);
         document.querySelector('[name="body"]').addEventListener('input', updatePreview);
-        document.querySelectorAll('.county-checkbox').forEach(cb => {
+        document.querySelectorAll('.county-checkbox, .police-checkbox').forEach(cb => {
             cb.addEventListener('change', updateCountyCount);
         });
 

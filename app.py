@@ -765,26 +765,77 @@ def admin_emails():
             # sheriff's official website — their domains do not have valid DNS MX
             # records and all sends will bounce. Add them here once verified.
             SHERIFFS_EMAILS = {
-                # DNS-verified (MX records confirmed)
-                'Flathead': 'sheriff@flathead.mt.gov',
-                'Gallatin': 'sheriff@gallatin.mt.gov',
-                'Madison': 'sheriff@madison.mt.gov',
-                'Prairie': 'sheriff@prairie.mt.gov',
-                'Stillwater': 'sheriff@stillwater.mt.gov',
-                # TODO: look up real email addresses for the remaining counties:
-                # Beaverhead, Big Horn, Blaine, Broadwater, Carbon, Carter,
-                # Cascade, Chouteau, Custer, Daniels, Dawson, Deer Lodge,
-                # Fallon, Fergus, Garfield, Glacier, Golden Valley, Granite,
-                # Hill, Jefferson, Judith Basin, Lake, Lewis and Clark, Liberty,
-                # Lincoln, McCone, Meagher, Mineral, Missoula, Musselshell,
-                # Park, Petroleum, Phillips, Pondera, Powder River, Powell,
-                # Ravalli, Richland, Roosevelt, Rosebud, Sanders, Sheridan,
-                # Silver Bow, Sweet Grass, Teton, Toole, Treasure, Valley,
-                # Wheatland, Wibaux, Yellowstone
+                'Beaverhead':      'sheriff@beaverheadcounty.gov',
+                'Big Horn':        'bso@bighorncountymt.gov',
+                'Blaine':          'bcsheriff@blainecounty-mt.gov',
+                'Broadwater':      'records@co.broadwater.mt.us',
+                'Carbon':          'carboncoso@co.carbon.mt.us',
+                'Carter':          'ccsomontana@gmail.com',
+                'Cascade':         'info@cascadecountysheriff.org',
+                'Chouteau':        'sheriff@chouteaucounty.org',
+                'Custer':          'ccso-records@co.custer.mt.us',
+                # 'Daniels': TODO — email address could not be verified (URL pasted by mistake)
+                'Dawson':          'dcsoadmin@dawsoncountymontana.com',
+                'Deer Lodge':      'dlrecords@adlc.us',
+                'Fallon':          'sheriff@falloncounty.net',
+                'Fergus':          'fcso@co.fergus.mt.us',
+                'Flathead':        'fcsorecords@flathead.mt.gov',
+                'Gallatin':        'publicrecordsrequests@gallatin.mt.gov',
+                'Garfield':        'garfieldcountysheriff@midrivers.com',
+                'Glacier':         'sheriffadmin@glaciercountymt.org',
+                'Golden Valley':   'gvso@itstriangle.com',
+                'Granite':         'sheriff@granitecountymt.gov',
+                'Hill':            'hillcosheriff@hillcounty.us',
+                'Jefferson':       'tgrimsrud@jeffersoncounty-mt.gov',
+                'Judith Basin':    'jbcso@jbcounty.org',
+                'Lake':            'lcsorecords@lakemt.gov',
+                'Lewis and Clark': 'records@lccountymt.gov',
+                'Liberty':         'lcso@libertycountymt.gov',
+                'Lincoln':         'lcsoadmin@libbymt.com',
+                'Madison':         'mcso@madisoncountymt.gov',
+                'McCone':          'mcconesheriff@midrivers.com',
+                'Meagher':         'mcso@meagherco.net',
+                'Mineral':         'records@co.mineral.mt.us',
+                'Missoula':        'MCSOrecords@missoulacounty.us',
+                'Musselshell':     'mcso@musselshellcounty.org',
+                'Park':            'sheriffrecords@parkcounty.org',
+                'Petroleum':       'petcoso@midrivers.com',
+                'Phillips':        'sheriff@phillipscountymt.gov',
+                'Pondera':         'brandy.egan@ponderacounty.org',
+                'Powder River':    'prso@prcounty.com',
+                'Powell':          'pcoso@powellcountymt.gov',
+                'Prairie':         'klewis@prairiecounty.org',
+                'Ravalli':         'rcso-records@rc.mt.gov',
+                'Richland':        'rcso-records@richland.org',
+                'Roosevelt':       'rcsosheriff@rooseveltcounty.org',
+                'Rosebud':         'afulton@rosebudcountymt.com',
+                'Sanders':         'sfielders@co.sanders.mt.us',
+                'Sheridan':        'ljohnson@sheridancountymt.gov',
+                'Silver Bow':      'bsbpolice@bsb.mt.gov',
+                'Stillwater':      'carnold@stillwatercountymt.gov',
+                'Sweet Grass':     'aronneberg@sgcountymt.gov',
+                'Teton':           'tcso@tetoncountymt.gov',
+                'Toole':           'tcsorecords@toolecountymt.gov',
+                'Treasure':        'msears@treasurecountymt.gov',
+                'Valley':          'tboyer@valleycountymt.gov',
+                'Wheatland':       'wcdisp@wheatlandcomt.gov',
+                'Wibaux':          'wibauxso@midrivers.com',
+                'Yellowstone':     'SheriffRecords@yellowstonecountymt.gov',
             }
-            
-            # Filter emails for selected counties
-            recipient_emails = [SHERIFFS_EMAILS[county] for county in counties if county in SHERIFFS_EMAILS]
+
+            POLICE_EMAILS = {
+                'Billings PD':   'BPDRecords@billingsmt.gov',
+                'Bozeman PD':    'bpdrecords@bozeman.net',
+                'Great Falls PD':'gfpdrecords@greatfallsmt.net',
+                'Helena PD':     'hpdrecords@helenamt.gov',
+                'Kalispell PD':  'kpdrecords@kalispell.com',
+                'Missoula PD':   'mpdrecords@ci.missoula.mt.us',
+            }
+
+            ALL_AGENCIES = {**SHERIFFS_EMAILS, **POLICE_EMAILS}
+
+            # Filter emails for selected agencies
+            recipient_emails = [ALL_AGENCIES[a] for a in counties if a in ALL_AGENCIES]
             
             if not recipient_emails:
                 flash('No valid sheriffs emails found for selected counties')
@@ -808,7 +859,8 @@ def admin_emails():
             
             return redirect(url_for('admin_emails'))
     
-    return render_template('admin_emails.html', counties=config.MONTANA_COUNTIES)
+    police_depts = ['Billings PD', 'Bozeman PD', 'Great Falls PD', 'Helena PD', 'Kalispell PD', 'Missoula PD']
+    return render_template('admin_emails.html', counties=config.MONTANA_COUNTIES, police_depts=police_depts)
 
 @app.route('/admin/emails/template/<template_type>')
 @login_required
