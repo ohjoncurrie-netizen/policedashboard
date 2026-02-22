@@ -83,9 +83,17 @@
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2">Sheriff Offices</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                     {% for county in counties %}
-                    <label class="flex items-center p-3 border border-slate-200 rounded-lg hover:bg-purple-50 cursor-pointer transition">
-                        <input type="checkbox" name="counties" value="{{ county }}" class="county-checkbox w-4 h-4 text-purple-600 rounded">
-                        <span class="ml-3 font-semibold text-slate-900">{{ county }}</span>
+                    {% set sent = county in already_emailed %}
+                    <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer transition
+                        {% if sent %}border-green-200 bg-green-50 opacity-60{% else %}border-slate-200 hover:bg-purple-50{% endif %}">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="counties" value="{{ county }}" class="county-checkbox w-4 h-4 text-purple-600 rounded"
+                                {% if sent %}disabled{% endif %}>
+                            <span class="ml-3 font-semibold text-slate-900">{{ county }}</span>
+                        </div>
+                        {% if sent %}
+                        <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Sent</span>
+                        {% endif %}
                     </label>
                     {% endfor %}
                 </div>
@@ -93,9 +101,17 @@
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2">Police Departments</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {% for dept in police_depts %}
-                    <label class="flex items-center p-3 border border-slate-200 rounded-lg hover:bg-blue-50 cursor-pointer transition">
-                        <input type="checkbox" name="counties" value="{{ dept }}" class="police-checkbox w-4 h-4 text-blue-600 rounded">
-                        <span class="ml-3 font-semibold text-slate-900">{{ dept }}</span>
+                    {% set sent = dept in already_emailed %}
+                    <label class="flex items-center justify-between p-3 border rounded-lg cursor-pointer transition
+                        {% if sent %}border-green-200 bg-green-50 opacity-60{% else %}border-slate-200 hover:bg-blue-50{% endif %}">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="counties" value="{{ dept }}" class="police-checkbox w-4 h-4 text-blue-600 rounded"
+                                {% if sent %}disabled{% endif %}>
+                            <span class="ml-3 font-semibold text-slate-900">{{ dept }}</span>
+                        </div>
+                        {% if sent %}
+                        <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Sent</span>
+                        {% endif %}
                     </label>
                     {% endfor %}
                 </div>

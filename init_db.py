@@ -177,6 +177,23 @@ def migrate():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_agency_type ON posts(agency_type)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_posts_incident_date ON posts(incident_date)')
 
+    # Blog posts table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS blog_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            body TEXT NOT NULL,
+            excerpt TEXT,
+            author TEXT DEFAULT 'Montana Blotter',
+            published INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_blog_published ON blog_posts(published)')
+
     # Subscribers table for public email digest
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS subscribers (
@@ -188,6 +205,18 @@ def migrate():
             created_at TEXT DEFAULT (datetime('now'))
         )
     ''')
+
+    # Emailed agencies — tracks which agencies have been contacted so duplicates are skipped
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS emailed_agencies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_name TEXT NOT NULL,
+            email_address TEXT NOT NULL,
+            subject TEXT,
+            sent_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_emailed_agency ON emailed_agencies(agency_name)')
 
     conn.commit()
     conn.close()

@@ -834,33 +834,69 @@ def admin_emails():
 
             ALL_AGENCIES = {**SHERIFFS_EMAILS, **POLICE_EMAILS}
 
-            # Filter emails for selected agencies
-            recipient_emails = [ALL_AGENCIES[a] for a in counties if a in ALL_AGENCIES]
-            
-            if not recipient_emails:
-                flash('No valid sheriffs emails found for selected counties')
+            # Load already-contacted agencies
+            conn = get_db()
+            already_emailed = {
+                row[0] for row in conn.execute(
+                    'SELECT DISTINCT agency_name FROM emailed_agencies'
+                ).fetchall()
+            }
+
+            # Split selected agencies into new vs already contacted
+            selected = [a for a in counties if a in ALL_AGENCIES]
+            skip = [a for a in selected if a in already_emailed]
+            to_send = [a for a in selected if a not in already_emailed]
+
+            if not to_send:
+                flash(f'All {len(skip)} selected agencies have already been contacted — no emails sent.')
+                conn.close()
                 return redirect(url_for('admin_emails'))
-            
-            # Send emails
+
+            # Send only to new agencies
             try:
                 from email_worker import EmailWorker
                 worker = EmailWorker()
-                results = worker.send_bulk_emails(recipient_emails, subject, body)
-                
+                results = worker.send_bulk_emails(
+                    [ALL_AGENCIES[a] for a in to_send], subject, body
+                )
+
+                # Log successful sends
+                for agency in to_send:
+                    email_addr = ALL_AGENCIES[agency]
+                    if results.get(email_addr):
+                        conn.execute(
+                            'INSERT INTO emailed_agencies (agency_name, email_address, subject) VALUES (?, ?, ?)',
+                            (agency, email_addr, subject)
+                        )
+                conn.commit()
+
                 successful = sum(1 for v in results.values() if v)
                 failed = len(results) - successful
-                
-                flash(f'✅ Emails sent! Success: {successful}/{len(results)}')
+
+                msg = f'✅ Emails sent! Success: {successful}/{len(to_send)}'
+                if skip:
+                    msg += f' | Skipped {len(skip)} already-contacted'
+                flash(msg)
                 if failed > 0:
                     flash(f'⚠️ Failed to send to {failed} recipients', 'warning')
-                
+
             except Exception as e:
                 flash(f'Error sending emails: {str(e)}')
-            
+            finally:
+                conn.close()
+
             return redirect(url_for('admin_emails'))
-    
+
     police_depts = ['Billings PD', 'Bozeman PD', 'Great Falls PD', 'Helena PD', 'Kalispell PD', 'Missoula PD']
-    return render_template('admin_emails.html', counties=config.MONTANA_COUNTIES, police_depts=police_depts)
+    conn = get_db()
+    already_emailed = {
+        row[0] for row in conn.execute(
+            'SELECT DISTINCT agency_name FROM emailed_agencies'
+        ).fetchall()
+    }
+    conn.close()
+    return render_template('admin_emails.html', counties=config.MONTANA_COUNTIES,
+                           police_depts=police_depts, already_emailed=already_emailed)
 
 @app.route('/admin/emails/template/<template_type>')
 @login_required
