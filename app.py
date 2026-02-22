@@ -754,6 +754,12 @@ def admin_emails():
     if request.method == 'POST':
         action = request.form.get('action')
         
+        if action == 'resend_bounced':
+            from resend_bounced import run as resend_run
+            resent, skipped = resend_run()
+            flash(f'✅ Bounced emails processed — Resent: {resent} | Skipped: {skipped}')
+            return redirect(url_for('admin_emails'))
+
         if action == 'send_to_sheriffs':
             # Get form data
             counties = request.form.getlist('counties')

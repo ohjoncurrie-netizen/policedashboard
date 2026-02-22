@@ -40,7 +40,21 @@
         {% endif %}
         {% endwith %}
 
-        <h1 class="text-3xl font-black text-slate-900 mb-8">Send Emails to Sheriffs Offices</h1>
+        <h1 class="text-3xl font-black text-slate-900 mb-6">Send Emails to Sheriffs Offices</h1>
+
+        <!-- Resend bounced emails -->
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex items-center justify-between">
+            <div>
+                <p class="font-black text-amber-900">Resend Bounced Emails</p>
+                <p class="text-sm text-amber-700 mt-1">Scans your IONOS inbox for delivery failures and resends them via Gmail.</p>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="resend_bounced">
+                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-black px-5 py-2 rounded-lg transition flex items-center gap-2">
+                    <i class="fas fa-rotate-right"></i> Resend Bounced
+                </button>
+            </form>
+        </div>
 
         <!-- Main Form -->
         <form method="POST" class="space-y-6">
