@@ -199,7 +199,7 @@ class EmailWorker:
         try:
             # Create message
             msg = MIMEMultipart('alternative')
-            msg['From'] = self.email_user
+            msg['From'] = config.SMTP_USER
             msg['To'] = to_address
             msg['Subject'] = subject
             
@@ -210,13 +210,14 @@ class EmailWorker:
             if html_body:
                 msg.attach(MIMEText(html_body, 'html'))
             
-            # Connect to SMTP server
+            # Connect to Gmail SMTP
             smtp = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT)
             smtp.starttls()
-            smtp.login(self.email_user, self.email_pass)
-            
-            # Send email
-            smtp.sendmail(self.email_user, to_address, msg.as_string())
+            smtp.login(config.SMTP_USER, config.SMTP_PASSWORD)
+
+            # Send from Gmail, reply-to IONOS address
+            msg['Reply-To'] = self.email_user
+            smtp.sendmail(config.SMTP_USER, to_address, msg.as_string())
             smtp.quit()
             
             logging.info(f"Email sent successfully to {to_address}")
