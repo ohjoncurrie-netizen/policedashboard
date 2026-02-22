@@ -366,6 +366,133 @@ def unsubscribe():
     return render_template('subscribe.html', counties=[], error='Invalid or expired unsubscribe link.')
 
 
+# ==========================================
+# BLOG — PUBLIC
+# ==========================================
+
+def _slugify(text):
+    import re as _re
+    text = text.lower().strip()
+    text = _re.sub(r'[^\w\s-]', '', text)
+    text = _re.sub(r'[\s_-]+', '-', text)
+    return text[:80]
+
+
+@app.template_filter('markdown')
+def render_markdown(text):
+    import markdown as _md
+    return _md.markdown(text or '', extensions=['extra', 'nl2br'])
+
+
+@app.route('/blog')
+def blog():
+    conn = get_db()
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = 10
+    total = conn.execute(
+        'SELECT COUNT(*) FROM blog_posts WHERE published=1').fetchone()[0]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    posts = conn.execute(
+        'SELECT * FROM blog_posts WHERE published=1 ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        (per_page, (page - 1) * per_page)).fetchall()
+    conn.close()
+    return render_template('blog.html', posts=posts, total=total,
+                           page=page, total_pages=total_pages)
+
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    conn = get_db()
+    post = conn.execute(
+        'SELECT * FROM blog_posts WHERE slug=? AND published=1', (slug,)).fetchone()
+    conn.close()
+    if not post:
+        return render_template('404.html'), 404
+    return render_template('blog_post.html', post=post)
+
+
+# ==========================================
+# BLOG — ADMIN
+# ==========================================
+
+@app.route('/admin/blog')
+@login_required
+def admin_blog():
+    conn = get_db()
+    posts = conn.execute(
+        'SELECT * FROM blog_posts ORDER BY created_at DESC').fetchall()
+    conn.close()
+    return render_template('admin_blog.html', posts=posts)
+
+
+@app.route('/admin/blog/new', methods=['GET', 'POST'])
+@login_required
+def admin_blog_new():
+    if request.method == 'POST':
+        title   = request.form.get('title', '').strip()
+        slug    = request.form.get('slug', '').strip() or _slugify(title)
+        body    = request.form.get('body', '').strip()
+        excerpt = request.form.get('excerpt', '').strip()
+        author  = request.form.get('author', 'Montana Blotter').strip()
+        published = 1 if request.form.get('published') else 0
+        if not title or not body:
+            flash('Title and body are required.', 'error')
+            return render_template('admin_blog_edit.html', post=None,
+                                   form=request.form)
+        conn = get_db()
+        try:
+            conn.execute(
+                'INSERT INTO blog_posts (title, slug, body, excerpt, author, published) '
+                'VALUES (?, ?, ?, ?, ?, ?)',
+                (title, slug, body, excerpt, author, published))
+            conn.commit()
+            flash('Post published!' if published else 'Post saved as draft.', 'success')
+            return redirect(url_for('admin_blog'))
+        except Exception as e:
+            flash(f'Error: {e}', 'error')
+        finally:
+            conn.close()
+    return render_template('admin_blog_edit.html', post=None, form={})
+
+
+@app.route('/admin/blog/<int:post_id>/edit', methods=['GET', 'POST'])
+@login_required
+def admin_blog_edit(post_id):
+    conn = get_db()
+    post = conn.execute('SELECT * FROM blog_posts WHERE id=?', (post_id,)).fetchone()
+    if not post:
+        conn.close()
+        return redirect(url_for('admin_blog'))
+    if request.method == 'POST':
+        title     = request.form.get('title', '').strip()
+        slug      = request.form.get('slug', '').strip() or _slugify(title)
+        body      = request.form.get('body', '').strip()
+        excerpt   = request.form.get('excerpt', '').strip()
+        author    = request.form.get('author', 'Montana Blotter').strip()
+        published = 1 if request.form.get('published') else 0
+        conn.execute(
+            'UPDATE blog_posts SET title=?, slug=?, body=?, excerpt=?, author=?, '
+            'published=?, updated_at=datetime("now") WHERE id=?',
+            (title, slug, body, excerpt, author, published, post_id))
+        conn.commit()
+        conn.close()
+        flash('Post updated.', 'success')
+        return redirect(url_for('admin_blog'))
+    conn.close()
+    return render_template('admin_blog_edit.html', post=post, form=post)
+
+
+@app.route('/admin/blog/<int:post_id>/delete', methods=['POST'])
+@login_required
+def admin_blog_delete(post_id):
+    conn = get_db()
+    conn.execute('DELETE FROM blog_posts WHERE id=?', (post_id,))
+    conn.commit()
+    conn.close()
+    flash('Post deleted.', 'success')
+    return redirect(url_for('admin_blog'))
+
+
 @app.route('/record/<int:record_id>')
 def view_record(record_id):
     """Public view of individual record"""
@@ -633,63 +760,27 @@ def admin_emails():
                 return redirect(url_for('admin_emails'))
             
             # Sheriffs email database (by county)
+            # NOTE: Only entries with confirmed valid MX records are included.
+            # The remaining ~50 counties need real addresses looked up from each
+            # sheriff's official website — their domains do not have valid DNS MX
+            # records and all sends will bounce. Add them here once verified.
             SHERIFFS_EMAILS = {
-                'Beaverhead': 'sheriff@beaverheadcounty.mt.gov',
-                'Big Horn': 'sheriff@bighorncounty.mt.gov',
-                'Blaine': 'sheriff@blainecounty.mt.gov',
-                'Broadwater': 'sheriff@broadwatercounty.mt.gov',
-                'Carbon': 'sheriff@carboncounty.mt.gov',
-                'Carter': 'sheriff@cartercounty.mt.gov',
-                'Cascade': 'sheriff@cascadecounty.mt.gov',
-                'Chouteau': 'sheriff@choteaucounty.mt.gov',
-                'Custer': 'sheriff@custercounty.mt.gov',
-                'Daniels': 'sheriff@danielscounty.mt.gov',
-                'Dawson': 'sheriff@dawsoncounty.mt.gov',
-                'Deer Lodge': 'sheriff@deerlodgecounty.mt.gov',
-                'Fallon': 'sheriff@falloncounty.mt.gov',
-                'Fergus': 'sheriff@ferguscounty.mt.gov',
-                'Flathead': 'sheriff@flatheadcounty.mt.gov',
-                'Gallatin': 'sheriff@gallatincounty.mt.gov',
-                'Garfield': 'sheriff@garfieldcounty.mt.gov',
-                'Glacier': 'sheriff@glaciercounty.mt.gov',
-                'Golden Valley': 'sheriff@goldenvalleycounty.mt.gov',
-                'Granite': 'sheriff@granitecounty.mt.gov',
-                'Hill': 'sheriff@hillcounty.mt.gov',
-                'Jefferson': 'sheriff@jeffersoncounty.mt.gov',
-                'Judith Basin': 'sheriff@judithbasincounty.mt.gov',
-                'Lake': 'sheriff@lakecounty.mt.gov',
-                'Lewis and Clark': 'sheriff@lewisandclarkcounty.mt.gov',
-                'Liberty': 'sheriff@libertycounty.mt.gov',
-                'Lincoln': 'sheriff@lincolncounty.mt.gov',
-                'Madison': 'sheriff@madisoncounty.mt.gov',
-                'McCone': 'sheriff@mcconecounty.mt.gov',
-                'Meagher': 'sheriff@meaghercounty.mt.gov',
-                'Mineral': 'sheriff@mineralcounty.mt.gov',
-                'Missoula': 'sheriff@missoulacounty.mt.gov',
-                'Musselshell': 'sheriff@musselshellcounty.mt.gov',
-                'Park': 'sheriff@parkcounty.mt.gov',
-                'Petroleum': 'sheriff@petroleumcounty.mt.gov',
-                'Phillips': 'sheriff@phillipscounty.mt.gov',
-                'Pondera': 'sheriff@ponderacounty.mt.gov',
-                'Powder River': 'sheriff@powderrivercounty.mt.gov',
-                'Powell': 'sheriff@powellcounty.mt.gov',
-                'Prairie': 'sheriff@prairiecounty.mt.gov',
-                'Ravalli': 'sheriff@ravallicounty.mt.gov',
-                'Richland': 'sheriff@richlandcounty.mt.gov',
-                'Roosevelt': 'sheriff@rooseveltcounty.mt.gov',
-                'Rosebud': 'sheriff@rosebudcounty.mt.gov',
-                'Sanders': 'sheriff@sanderscounty.mt.gov',
-                'Sheridan': 'sheriff@sheridancounty.mt.gov',
-                'Silver Bow': 'sheriff@silverbowcounty.mt.gov',
-                'Stillwater': 'sheriff@stillwatercounty.mt.gov',
-                'Sweet Grass': 'sheriff@sweetgrasscounty.mt.gov',
-                'Teton': 'sheriff@tetoncounty.mt.gov',
-                'Toole': 'sheriff@toolecounty.mt.gov',
-                'Treasure': 'sheriff@treasurecounty.mt.gov',
-                'Valley': 'sheriff@valleycounty.mt.gov',
-                'Wheatland': 'sheriff@wheatlandcounty.mt.gov',
-                'Wibaux': 'sheriff@wibauxcounty.mt.gov',
-                'Yellowstone': 'sheriff@yellowstonecounty.mt.gov'
+                # DNS-verified (MX records confirmed)
+                'Flathead': 'sheriff@flathead.mt.gov',
+                'Gallatin': 'sheriff@gallatin.mt.gov',
+                'Madison': 'sheriff@madison.mt.gov',
+                'Prairie': 'sheriff@prairie.mt.gov',
+                'Stillwater': 'sheriff@stillwater.mt.gov',
+                # TODO: look up real email addresses for the remaining counties:
+                # Beaverhead, Big Horn, Blaine, Broadwater, Carbon, Carter,
+                # Cascade, Chouteau, Custer, Daniels, Dawson, Deer Lodge,
+                # Fallon, Fergus, Garfield, Glacier, Golden Valley, Granite,
+                # Hill, Jefferson, Judith Basin, Lake, Lewis and Clark, Liberty,
+                # Lincoln, McCone, Meagher, Mineral, Missoula, Musselshell,
+                # Park, Petroleum, Phillips, Pondera, Powder River, Powell,
+                # Ravalli, Richland, Roosevelt, Rosebud, Sanders, Sheridan,
+                # Silver Bow, Sweet Grass, Teton, Toole, Treasure, Valley,
+                # Wheatland, Wibaux, Yellowstone
             }
             
             # Filter emails for selected counties
