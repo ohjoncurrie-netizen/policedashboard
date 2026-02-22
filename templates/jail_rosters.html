@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Montana Jail Rosters | Montana Blotter</title>
+    <meta name="description" content="Links to every Montana county jail roster and inmate search page. Find current inmate information for all 56 Montana counties.">
+</head>
+<body class="bg-slate-50 font-sans">
+
+    <!-- Nav -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="font-black text-slate-900 uppercase italic tracking-tight text-lg">Montana Blotter</a>
+            <div class="flex items-center gap-5 overflow-x-auto">
+                <a href="/" class="text-xs text-slate-500 hover:text-slate-900 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-home mr-1"></i>Feed
+                </a>
+                <a href="/arrests" class="text-xs text-slate-500 hover:text-red-600 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-handcuffs mr-1"></i>Arrests
+                </a>
+                <a href="/jail-rosters" class="text-xs text-orange-600 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-bars mr-1"></i>Jail Rosters
+                </a>
+                <a href="/laws" class="text-xs text-slate-500 hover:text-indigo-600 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-scale-balanced mr-1"></i>Laws
+                </a>
+                <a href="/blog" class="text-xs text-slate-500 hover:text-emerald-600 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-pen-nib mr-1"></i>Blog
+                </a>
+                <a href="/subscribe" class="text-xs text-blue-600 hover:text-blue-700 font-bold uppercase tracking-widest whitespace-nowrap">
+                    <i class="fas fa-envelope mr-1"></i>Subscribe
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="bg-slate-900 text-white py-14 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="inline-flex items-center bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-4">
+                <i class="fas fa-bars mr-2"></i>Public Records
+            </div>
+            <h1 class="text-4xl font-black mb-3">Montana Jail Rosters</h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Links to official inmate search and jail roster pages for all 56 Montana counties.
+                All data is sourced directly from county sheriff's offices and detention centers.
+            </p>
+            <!-- Search filter -->
+            <div class="mt-6 max-w-sm mx-auto">
+                <input id="countySearch" type="text" placeholder="Search county..."
+                    class="w-full px-4 py-2 rounded-lg text-slate-900 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- State-level resources bar -->
+    <div class="bg-orange-50 border-b border-orange-200">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap gap-4 items-center">
+            <span class="text-xs font-black text-orange-800 uppercase tracking-widest">Statewide Resources:</span>
+            <a href="https://offendersearch.mt.gov/conweb/" target="_blank"
+               class="text-xs font-bold text-orange-700 hover:text-orange-900 underline">
+                <i class="fas fa-external-link-alt mr-1"></i>MT Dept. of Corrections Offender Search
+            </a>
+            <a href="https://vinelink.vineapps.com/state/mt" target="_blank"
+               class="text-xs font-bold text-orange-700 hover:text-orange-900 underline">
+                <i class="fas fa-external-link-alt mr-1"></i>VINELink (Statewide Victim Notification)
+            </a>
+            <a href="https://montanajailroster.com/" target="_blank"
+               class="text-xs font-bold text-orange-700 hover:text-orange-900 underline">
+                <i class="fas fa-external-link-alt mr-1"></i>Montana Jail Roster Aggregator
+            </a>
+        </div>
+    </div>
+
+    <!-- County grid -->
+    <div class="max-w-6xl mx-auto px-4 py-10">
+
+        <p class="text-sm text-slate-500 mb-6">
+            <i class="fas fa-info-circle mr-1"></i>
+            <strong class="text-green-700"><i class="fas fa-circle text-xs"></i> Online roster</strong> — direct link available &nbsp;|&nbsp;
+            <strong class="text-slate-500"><i class="fas fa-circle text-xs"></i> Phone only</strong> — no public online roster found
+        </p>
+
+        <div id="countyGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            {% set counties = [
+                ("Beaverhead", "https://beaverheadcountymt.gov/departments/sheriff/", "406-683-3700", True),
+                ("Big Horn", "https://www.bighorncountymt.gov/239/Detention", "406-665-9780", True),
+                ("Blaine", None, "406-357-3260", False),
+                ("Broadwater", "https://www.broadwatercountysheriff.org/roster.php", "406-266-3445", True),
+                ("Carbon", "https://carbonmt.gov/sheriff/", "406-446-1234", True),
+                ("Carter", None, "406-775-8741", False),
+                ("Cascade", "https://www.cascadecountymt.gov/314/Inmate-Roster", "406-454-6840", True),
+                ("Chouteau", None, "406-622-3660", False),
+                ("Custer", "https://www.custercountysheriff.com/inmate-search", "406-874-3300", True),
+                ("Daniels", None, "406-487-2691", False),
+                ("Dawson", "https://www.dawsoncountymontana.com/sheriff", "406-377-7600", True),
+                ("Deer Lodge", None, "406-563-5421", False),
+                ("Fallon", None, "406-778-2879", False),
+                ("Fergus", "https://fergusmt.gov/detention-center-roster", "406-535-3860", True),
+                ("Flathead", "https://apps.flathead.mt.gov/jailroster/", "406-758-5610", True),
+                ("Gallatin", "https://gallatin-so-mt.zuercherportal.com/#/inmates", "406-582-2100", True),
+                ("Garfield", None, "406-557-2540", False),
+                ("Glacier", "https://glaciercountymt.gov/category/jail-roster/", "406-873-4600", True),
+                ("Golden Valley", None, "406-568-2321", False),
+                ("Granite", "https://granitecountyjail.org/", "406-859-3771", True),
+                ("Hill", "https://vinelink.vineapps.com/state/mt", "406-265-5481", True),
+                ("Jefferson", "https://www.jeffersoncountysheriffmt.gov/", "406-225-4075", True),
+                ("Judith Basin", None, "406-535-3860", False),
+                ("Lake", None, "406-883-7301", False),
+                ("Lewis and Clark", "https://www.lccountymt.gov/Sheriff/Detention-Center", "406-447-8270", True),
+                ("Liberty", None, "406-759-5171", False),
+                ("Lincoln", "http://inmateroster.lincolncountysheriff.us/", "406-293-0242", True),
+                ("Madison", "https://webportal.mcits.site/NewWorld.InmateInquiry/MadisonCountyJail", "406-843-5351", True),
+                ("McCone", None, "406-485-3405", False),
+                ("Meagher", None, "406-547-3397", False),
+                ("Mineral", "https://co.mineral.mt.us/departments/sheriff/", "406-822-3534", True),
+                ("Missoula", "https://webapps.missoulacounty.us/jailroster/Inmates", "406-258-4780", True),
+                ("Musselshell", None, "406-323-1122", False),
+                ("Park", "https://www.parkcounty.org/Government-Departments/Sheriff-s-Office/Inmates-Housed/", "406-222-4172", True),
+                ("Petroleum", None, "406-429-6551", False),
+                ("Phillips", "https://phillipscosheriff.com/inmates/", "406-654-2020", True),
+                ("Pondera", "https://ponderacountyjail.org/inmate-search/", "406-271-4100", True),
+                ("Powder River", None, "406-436-2260", False),
+                ("Powell", "https://www.powellcountymt.gov/sheriff/page/detention-facility", "406-846-2711", True),
+                ("Prairie", None, "406-635-5738", False),
+                ("Ravalli", "https://ravallicounty.gov/239/Adult-Detention-Center", "406-375-4060", True),
+                ("Richland", None, "406-433-2919", False),
+                ("Roosevelt", None, "406-653-6230", False),
+                ("Rosebud", None, "406-346-2715", False),
+                ("Sanders", "https://sanders-mt.publiclogs.com/", "406-827-3584", True),
+                ("Sheridan", None, "406-765-1200", False),
+                ("Silver Bow", "https://co.silverbow.mt.us/3274/Detention-Center", "406-497-1120", True),
+                ("Stillwater", None, "406-322-5326", False),
+                ("Sweet Grass", None, "406-932-5143", False),
+                ("Teton", None, "406-466-5781", False),
+                ("Toole", None, "406-434-5585", False),
+                ("Treasure", None, "406-342-5211", False),
+                ("Valley", "https://www.valleycountymt.gov/1288/Jail-Roster", "406-228-9355", True),
+                ("Wheatland", None, "406-632-4311", False),
+                ("Wibaux", None, "406-796-2415", False),
+                ("Yellowstone", "https://www.yellowstonecountymt.gov/sheriff/detention/dcsearch.asp", "406-256-2929", True),
+            ] %}
+
+            {% for name, url, phone, has_online in counties %}
+            <div class="county-card bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-2"
+                 data-county="{{ name | lower }}">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h3 class="font-black text-slate-900 text-base">{{ name }} County</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">{{ name }} County Sheriff's Office</p>
+                    </div>
+                    {% if has_online %}
+                    <span class="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <i class="fas fa-circle text-green-500 text-xs mr-1"></i>Online
+                    </span>
+                    {% else %}
+                    <span class="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <i class="fas fa-phone text-xs mr-1"></i>Phone
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center gap-3 mt-1">
+                    {% if url %}
+                    <a href="{{ url }}" target="_blank" rel="noopener"
+                       class="flex-1 text-center text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white py-2 px-3 rounded-lg transition">
+                        <i class="fas fa-external-link-alt mr-1"></i>View Roster
+                    </a>
+                    {% else %}
+                    <a href="https://vinelink.vineapps.com/state/mt" target="_blank" rel="noopener"
+                       class="flex-1 text-center text-sm font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 px-3 rounded-lg transition">
+                        <i class="fas fa-external-link-alt mr-1"></i>VINELink
+                    </a>
+                    {% endif %}
+                    <a href="tel:{{ phone }}"
+                       class="text-sm font-bold text-slate-600 hover:text-slate-900 border border-slate-200 py-2 px-3 rounded-lg transition whitespace-nowrap">
+                        <i class="fas fa-phone mr-1"></i>{{ phone }}
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-900 mt-10">
+            <p class="font-bold mb-1"><i class="fas fa-triangle-exclamation mr-2"></i>Disclaimer</p>
+            <p>Jail roster links are provided as a public convenience and may change without notice. Montana Blotter is not affiliated with any county government. For the most current inmate information, contact the county sheriff's office directly. Inmate status can change rapidly — always verify with the detention facility.</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 text-center text-xs py-6 mt-4">
+        <p>&copy; 2026 Montana Blotter &mdash; Public safety transparency for Montana communities.</p>
+        <div class="flex justify-center gap-6 mt-3">
+            <a href="/" class="hover:text-white transition">Feed</a>
+            <a href="/arrests" class="hover:text-white transition">Arrests</a>
+            <a href="/jail-rosters" class="hover:text-white transition">Jail Rosters</a>
+            <a href="/laws" class="hover:text-white transition">Laws</a>
+            <a href="/blog" class="hover:text-white transition">Blog</a>
+            <a href="/subscribe" class="hover:text-white transition">Subscribe</a>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('countySearch').addEventListener('input', function() {
+            const q = this.value.toLowerCase();
+            document.querySelectorAll('.county-card').forEach(card => {
+                card.style.display = card.dataset.county.includes(q) ? '' : 'none';
+            });
+        });
+    </script>
+
+</body>
+</html>
