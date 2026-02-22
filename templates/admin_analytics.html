@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Analytics | Admin Panel</title>
+</head>
+<body class="bg-slate-50 font-sans">
+
+    <nav class="bg-slate-900 text-white p-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <a href="/admin" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="bg-emerald-600 p-2 rounded-xl">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <span class="font-black uppercase italic">Analytics</span>
+            </div>
+            <div class="flex gap-4">
+                <a href="/" class="text-sm hover:text-blue-400 transition">View Site</a>
+                <a href="/admin/logout" class="text-sm text-red-400 hover:text-red-300 transition">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6">
+
+        <h1 class="text-3xl font-black text-slate-900 mb-8">Analytics Overview</h1>
+
+        <!-- Incidents per day — full width line chart -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-6">
+            <h2 class="font-black text-lg mb-4 flex items-center gap-2">
+                <i class="fas fa-chart-line text-emerald-600"></i>
+                Incidents — Last 30 Days
+            </h2>
+            <canvas id="dailyChart" height="80"></canvas>
+        </div>
+
+        <!-- 2-col grid for smaller charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+            <!-- Top incident types -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h2 class="font-black text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-list text-blue-600"></i>
+                    Top 10 Incident Types
+                </h2>
+                <canvas id="typeChart"></canvas>
+            </div>
+
+            <!-- Agency type breakdown -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h2 class="font-black text-lg mb-4 flex items-center gap-2">
+                    <i class="fas fa-building text-purple-600"></i>
+                    Agency Type Breakdown
+                </h2>
+                <canvas id="agencyChart"></canvas>
+            </div>
+
+        </div>
+
+        <!-- Counties this month vs last month — full width -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-6">
+            <h2 class="font-black text-lg mb-4 flex items-center gap-2">
+                <i class="fas fa-map-marked-alt text-orange-600"></i>
+                Top Counties — This Month vs Last Month
+            </h2>
+            <canvas id="countyChart" height="80"></canvas>
+        </div>
+
+        <!-- Blotters per month -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+            <h2 class="font-black text-lg mb-4 flex items-center gap-2">
+                <i class="fas fa-file-pdf text-red-600"></i>
+                Blotters Received per Month
+            </h2>
+            <canvas id="blotterChart" height="60"></canvas>
+        </div>
+
+    </div>
+
+    <script>
+        const dailyLabels  = {{ daily_labels | tojson }};
+        const dailyCounts  = {{ daily_counts | tojson }};
+        const typeLabels   = {{ type_labels  | tojson }};
+        const typeCounts   = {{ type_counts  | tojson }};
+        const agencyLabels = {{ agency_labels | tojson }};
+        const agencyCounts = {{ agency_counts | tojson }};
+        const countyLabels = {{ county_labels | tojson }};
+        const countyThis   = {{ county_this   | tojson }};
+        const countyLast   = {{ county_last   | tojson }};
+        const blotterLabels = {{ blotter_labels | tojson }};
+        const blotterCounts = {{ blotter_counts | tojson }};
+
+        // Incidents per day
+        new Chart(document.getElementById('dailyChart'), {
+            type: 'line',
+            data: {
+                labels: dailyLabels,
+                datasets: [{
+                    label: 'Incidents',
+                    data: dailyCounts,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16,185,129,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        // Top incident types (horizontal bar)
+        new Chart(document.getElementById('typeChart'), {
+            type: 'bar',
+            data: {
+                labels: typeLabels,
+                datasets: [{
+                    label: 'Count',
+                    data: typeCounts,
+                    backgroundColor: '#3b82f6',
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+
+        // Agency type doughnut
+        new Chart(document.getElementById('agencyChart'), {
+            type: 'doughnut',
+            data: {
+                labels: agencyLabels,
+                datasets: [{
+                    data: agencyCounts,
+                    backgroundColor: ['#6366f1', '#f59e0b', '#10b981', '#ef4444'],
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // Counties grouped bar
+        new Chart(document.getElementById('countyChart'), {
+            type: 'bar',
+            data: {
+                labels: countyLabels,
+                datasets: [
+                    { label: 'This Month', data: countyThis, backgroundColor: '#f97316' },
+                    { label: 'Last Month', data: countyLast, backgroundColor: '#fed7aa' },
+                ]
+            },
+            options: { plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        // Blotters per month
+        new Chart(document.getElementById('blotterChart'), {
+            type: 'bar',
+            data: {
+                labels: blotterLabels,
+                datasets: [{
+                    label: 'Blotters',
+                    data: blotterCounts,
+                    backgroundColor: '#ef4444',
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+    </script>
+
+</body>
+</html>

@@ -947,6 +947,160 @@ Montana Blotter Project
     return jsonify(TEMPLATES[template_type])
 
 # ==========================================
+# PUBLIC JSON API
+# ==========================================
+
+@app.route('/api/posts')
+def api_posts():
+    conn = get_db()
+    page     = max(1, request.args.get('page', 1, type=int))
+    per_page = min(100, max(1, request.args.get('per_page', 20, type=int)))
+    county      = request.args.get('county', '').strip()
+    agency_type = request.args.get('agency_type', '').strip()
+    date_from   = request.args.get('date_from', '').strip()
+    date_to     = request.args.get('date_to', '').strip()
+    search      = request.args.get('search', '').strip()
+
+    where, params = [], []
+    if county:
+        where.append('county = ?'); params.append(county)
+    if agency_type:
+        where.append('agency_type = ?'); params.append(agency_type)
+    if date_from:
+        where.append('incident_date >= ?'); params.append(date_from)
+    if date_to:
+        where.append('incident_date <= ?'); params.append(date_to)
+    if search:
+        where.append('(title LIKE ? OR summary LIKE ?)'); params += [f'%{search}%', f'%{search}%']
+
+    clause = ('WHERE ' + ' AND '.join(where)) if where else ''
+    total = conn.execute(f'SELECT COUNT(*) FROM posts {clause}', params).fetchone()[0]
+    rows  = conn.execute(
+        f'SELECT id, title, summary, county, agency_name, agency_type, '
+        f'incident_date, incident_type, created_at FROM posts {clause} '
+        f'ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        params + [per_page, (page - 1) * per_page]
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        'posts': [dict(r) for r in rows],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': max(1, (total + per_page - 1) // per_page)
+    })
+
+
+@app.route('/api/posts/<int:post_id>')
+def api_post(post_id):
+    conn = get_db()
+    row = conn.execute(
+        'SELECT id, title, summary, county, agency_name, agency_type, '
+        'incident_date, incident_type, created_at FROM posts WHERE id = ?',
+        (post_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify(dict(row))
+
+
+@app.route('/api/counties')
+def api_counties():
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT COALESCE(p.county, "Unknown") AS county, '
+        'COUNT(DISTINCT p.id) AS post_count, '
+        'COUNT(DISTINCT r.id) AS record_count '
+        'FROM posts p LEFT JOIN records r ON r.county = p.county '
+        'GROUP BY p.county ORDER BY post_count DESC'
+    ).fetchall()
+    conn.close()
+    return jsonify({'counties': [dict(r) for r in rows]})
+
+
+@app.route('/api/agencies')
+def api_agencies():
+    conn = get_db()
+    rows = conn.execute(
+        'SELECT agency_name, agency_type, county, COUNT(*) AS post_count '
+        'FROM posts WHERE agency_name IS NOT NULL '
+        'GROUP BY agency_name ORDER BY post_count DESC'
+    ).fetchall()
+    conn.close()
+    return jsonify({'agencies': [dict(r) for r in rows]})
+
+
+# ==========================================
+# ADMIN ANALYTICS
+# ==========================================
+
+@app.route('/admin/analytics')
+@login_required
+def admin_analytics():
+    conn = get_db()
+
+    # Incidents per day — last 30 days
+    daily_rows = conn.execute(
+        "SELECT date(created_at) AS day, COUNT(*) AS cnt FROM records "
+        "WHERE created_at >= date('now', '-30 days') "
+        "GROUP BY day ORDER BY day"
+    ).fetchall()
+    daily_labels = [r['day'] for r in daily_rows]
+    daily_counts = [r['cnt'] for r in daily_rows]
+
+    # Top 10 incident types
+    type_rows = conn.execute(
+        "SELECT COALESCE(incident_type, 'Unknown') AS itype, COUNT(*) AS cnt "
+        "FROM records WHERE incident_type IS NOT NULL AND incident_type != '' "
+        "GROUP BY itype ORDER BY cnt DESC LIMIT 10"
+    ).fetchall()
+    type_labels = [r['itype'] for r in type_rows]
+    type_counts = [r['cnt'] for r in type_rows]
+
+    # Agency type breakdown
+    agency_rows = conn.execute(
+        "SELECT COALESCE(agency_type, 'other') AS atype, COUNT(*) AS cnt "
+        "FROM posts GROUP BY atype"
+    ).fetchall()
+    agency_labels = [r['atype'].title() for r in agency_rows]
+    agency_counts = [r['cnt'] for r in agency_rows]
+
+    # Top 10 counties — this month vs last month
+    county_this = {r['county']: r['cnt'] for r in conn.execute(
+        "SELECT COALESCE(county, 'Unknown') AS county, COUNT(*) AS cnt FROM records "
+        "WHERE created_at >= date('now', 'start of month') "
+        "GROUP BY county ORDER BY cnt DESC LIMIT 10"
+    ).fetchall()}
+    county_last = {r['county']: r['cnt'] for r in conn.execute(
+        "SELECT COALESCE(county, 'Unknown') AS county, COUNT(*) AS cnt FROM records "
+        "WHERE created_at >= date('now', 'start of month', '-1 month') "
+        "AND created_at < date('now', 'start of month') "
+        "GROUP BY county ORDER BY cnt DESC LIMIT 10"
+    ).fetchall()}
+    county_labels = sorted(set(list(county_this.keys()) + list(county_last.keys())))[:10]
+    county_this_vals = [county_this.get(c, 0) for c in county_labels]
+    county_last_vals = [county_last.get(c, 0) for c in county_labels]
+
+    # Blotters received per month — last 12 months
+    blotter_rows = conn.execute(
+        "SELECT strftime('%Y-%m', upload_date) AS mo, COUNT(*) AS cnt "
+        "FROM blotters GROUP BY mo ORDER BY mo DESC LIMIT 12"
+    ).fetchall()
+    blotter_labels = [r['mo'] for r in reversed(blotter_rows)]
+    blotter_counts = [r['cnt'] for r in reversed(blotter_rows)]
+
+    conn.close()
+    return render_template('admin_analytics.html',
+        daily_labels=daily_labels, daily_counts=daily_counts,
+        type_labels=type_labels, type_counts=type_counts,
+        agency_labels=agency_labels, agency_counts=agency_counts,
+        county_labels=county_labels, county_this=county_this_vals, county_last=county_last_vals,
+        blotter_labels=blotter_labels, blotter_counts=blotter_counts,
+    )
+
+
+# ==========================================
 # ERROR HANDLERS
 # ==========================================
 
